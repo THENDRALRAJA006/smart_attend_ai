@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: smartattend-backend
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: starter
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ENVIRONMENT
+        value: production
+      - key: ARCFACE_MODEL_NAME
+        value: buffalo_l
+      - key: MAX_FACE_EMBEDDINGS
+        value: "50"
+      - key: LIVENESS_TOKEN_EXPIRY_MINUTES
+        value: "3"
+      - key: SIMILARITY_THRESHOLD_PRESENT
+        value: "0.80"
+      - key: SIMILARITY_THRESHOLD_REVIEW
+        value: "0.65"

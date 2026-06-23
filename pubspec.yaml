@@ -1,0 +1,51 @@
+name: smart_attend_ai
+description: "SmartAttend AI College Attendance System Mobile App"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  
+  # State management & routing
+  get: ^4.6.6
+  
+  # Networking
+  dio: ^5.4.1
+  
+  # BLE Beacon Proximity Scanning
+  flutter_blue_plus: ^1.31.1
+  
+  # Selfie Camera
+  camera: ^0.10.5+9
+  
+  # QR Scanner fallback
+  mobile_scanner: ^5.0.0
+  
+  # Secure Storage for JWT token
+  flutter_secure_storage: ^9.0.0
+  
+  # Permissions handler
+  permission_handler: ^11.3.1
+  
+  # QR Code generation for Faculty
+  qr_flutter: ^4.1.0
+  
+  # Date formatting
+  intl: ^0.19.0
+  
+  # Local paths for camera frames buffer
+  path_provider: ^2.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
