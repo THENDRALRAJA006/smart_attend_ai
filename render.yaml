@@ -2,6 +2,7 @@ services:
   - type: web
     name: smartattend-backend
     env: docker
+    rootDir: smartattend_backend
     dockerfilePath: Dockerfile
     plan: starter
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT

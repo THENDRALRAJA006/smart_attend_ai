@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     @classmethod
     def assemble_db_url(cls, v: Optional[str]) -> Optional[str]:
         if v:
+            # Strip pgbouncer query parameter as it is unsupported by psycopg2
+            if "pgbouncer=true" in v:
+                v = v.replace("pgbouncer=true", "")
+                v = v.replace("?&", "?").replace("&&", "&").rstrip("?").rstrip("&")
             # Ensure correct PostgreSQL driver prefix for psycopg2
             if v.startswith("postgresql://"):
                 v = v.replace("postgresql://", "postgresql+psycopg2://")
