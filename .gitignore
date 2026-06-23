@@ -50,3 +50,8 @@ venv/
 __pycache__/
 *.pyc
 .env
+
+/lib/generated/prisma
+
+node_modules/
+.env.local
