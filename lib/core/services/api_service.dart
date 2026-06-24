@@ -23,19 +23,26 @@ class ApiService extends getx.GetxService {
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
+        print('API Request: ${options.uri}');
         return handler.next(options);
       },
+      onResponse: (response, handler) {
+        print('API Response: $response');
+        return handler.next(response);
+      },
       onError: (DioException error, handler) async {
+        print('API Request: ${error.requestOptions.uri}');
+        print('API Response: ${error.response}');
+        
+        final statusCode = error.response?.statusCode;
+        
         // Handle 401 Token Refresh
-        if (error.response?.statusCode == 401) {
+        if (statusCode == 401) {
           final success = await _attemptTokenRefresh();
           if (success) {
-            // Retry the request with the new token
             final requestOptions = error.requestOptions;
             final newToken = await _storage.read(key: 'jwt_token');
             requestOptions.headers['Authorization'] = 'Bearer $newToken';
-            
-            // Re-execute request
             try {
               final response = await dio.fetch(requestOptions);
               return handler.resolve(response);
@@ -43,7 +50,6 @@ class ApiService extends getx.GetxService {
               return handler.next(error);
             }
           } else {
-            // Logout and redirect to login page
             await _storage.delete(key: 'jwt_token');
             getx.Get.offAllNamed('/login');
             getx.Get.snackbar(
@@ -51,31 +57,55 @@ class ApiService extends getx.GetxService {
               'Your session has expired. Please login again.',
               snackPosition: getx.SnackPosition.BOTTOM,
             );
-          }
-        } else {
-          // Do not show error banners for 404 (Not Found) as it's a normal response for checking active states
-          if (error.response?.statusCode == 404) {
             return handler.next(error);
           }
-          
-          // General Network Error Banner
-          String errorMsg = 'An unexpected network error occurred.';
-          if (error.type == DioExceptionType.connectionTimeout) {
-            errorMsg = 'Connection timed out. Please check your internet connection.';
-          } else if (error.response != null) {
+        }
+
+        // Do not show error banners for 404 (Not Found) if it's checking active states
+        final path = error.requestOptions.path;
+        if (statusCode == 404 && path.contains('/session/active')) {
+          return handler.next(error);
+        }
+
+        String errorMsg = 'An unexpected error occurred.';
+        
+        if (error.type == DioExceptionType.connectionTimeout ||
+            error.type == DioExceptionType.sendTimeout ||
+            error.type == DioExceptionType.receiveTimeout) {
+          errorMsg = 'Network timeout: Connection timed out. Please check your internet connection.';
+        } else if (error.type == DioExceptionType.connectionError) {
+          errorMsg = 'Backend unavailable: Cannot connect to the server. Please check if the backend is running.';
+        } else if (error.type == DioExceptionType.badResponse) {
+          if (statusCode == 400) {
+            errorMsg = 'Bad Request (400): ';
             final data = error.response?.data;
             if (data is Map && data.containsKey('detail')) {
-              errorMsg = data['detail'];
+              errorMsg += data['detail'];
+            } else {
+              errorMsg += 'Invalid input request.';
             }
+          } else if (statusCode == 403) {
+            errorMsg = 'Forbidden (403): Access denied. You do not have permission.';
+          } else if (statusCode == 404) {
+            errorMsg = 'Not Found (404): The requested resource was not found.';
+          } else if (statusCode == 500) {
+            errorMsg = 'Internal Server Error (500): The server encountered an error processing your request.';
+          } else {
+            errorMsg = 'Error ($statusCode): ${error.response?.statusMessage ?? 'Bad response received.'}';
           }
-          getx.Get.snackbar(
-            'Error',
-            errorMsg,
-            snackPosition: getx.SnackPosition.BOTTOM,
-            backgroundColor: getx.Get.theme.colorScheme.errorContainer,
-            colorText: getx.Get.theme.colorScheme.onErrorContainer,
-          );
+        } else {
+          errorMsg = 'Backend unavailable: The server did not respond or returned an invalid response.';
         }
+
+        getx.Get.snackbar(
+          'API Error',
+          errorMsg,
+          snackPosition: getx.SnackPosition.BOTTOM,
+          backgroundColor: getx.Get.theme.colorScheme.errorContainer,
+          colorText: getx.Get.theme.colorScheme.onErrorContainer,
+          duration: const Duration(seconds: 4),
+        );
+
         return handler.next(error);
       },
     ));

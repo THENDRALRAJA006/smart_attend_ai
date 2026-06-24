@@ -7,7 +7,7 @@ class ApiConstants {
   // Android emulator: use 10.0.2.2 to reach localhost
   // Physical device: use your machine's local IP or Render URL
   // Production: https://your-app.onrender.com
-  static String baseUrl = 'http://10.0.2.2:8000';
+  static String baseUrl = 'https://smart-attend-ai-20u4.onrender.com';
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   static const String registerStudent = '/auth/student/register';
