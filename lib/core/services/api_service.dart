@@ -10,8 +10,8 @@ class ApiService extends getx.GetxService {
   Future<ApiService> init() async {
     dio = Dio(BaseOptions(
       baseUrl: ApiConstants.baseUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 60),
       headers: {
         'Accept': 'application/json',
       },
@@ -23,16 +23,27 @@ class ApiService extends getx.GetxService {
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
-        print('API Request: ${options.uri}');
+        print('--- API REQUEST ---');
+        print('Request URL: ${options.uri}');
+        print('Request Payload: ${options.data}');
+        print('--------------------');
         return handler.next(options);
       },
       onResponse: (response, handler) {
-        print('API Response: $response');
+        print('--- API RESPONSE ---');
+        print('Request URL: ${response.requestOptions.uri}');
+        print('Response Status: ${response.statusCode}');
+        print('Response Body: ${response.data}');
+        print('---------------------');
         return handler.next(response);
       },
       onError: (DioException error, handler) async {
-        print('API Request: ${error.requestOptions.uri}');
-        print('API Response: ${error.response}');
+        print('--- API ERROR ---');
+        print('Request URL: ${error.requestOptions.uri}');
+        print('Response Status: ${error.response?.statusCode}');
+        print('Error Message: ${error.message}');
+        print('Response Body: ${error.response?.data}');
+        print('-----------------');
         
         final statusCode = error.response?.statusCode;
         
@@ -133,10 +144,27 @@ class ApiService extends getx.GetxService {
       }
 
       // We make a raw request bypassing interceptors to avoid loops
-      final response = await Dio(BaseOptions(baseUrl: ApiConstants.baseUrl)).post(
+      final options = BaseOptions(
+        baseUrl: ApiConstants.baseUrl,
+        connectTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+      );
+      final rawDio = Dio(options);
+      
+      print('--- API REQUEST (REFRESH) ---');
+      print('Request URL: ${ApiConstants.baseUrl}$loginPath');
+      print('Request Payload: {"email": $email, "password": "..."}');
+      print('-----------------------------');
+
+      final response = await rawDio.post(
         loginPath,
         data: {'email': email, 'password': password},
       );
+
+      print('--- API RESPONSE (REFRESH) ---');
+      print('Response Status: ${response.statusCode}');
+      print('Response Body: ${response.data}');
+      print('------------------------------');
 
       if (response.statusCode == 200) {
         final token = response.data['token']['access_token'];

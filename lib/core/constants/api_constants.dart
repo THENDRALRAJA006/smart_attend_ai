@@ -10,7 +10,7 @@ class ApiConstants {
   static String baseUrl = 'https://smart-attend-ai-20u4.onrender.com';
 
   // ── Auth ──────────────────────────────────────────────────────────────────
-  static const String registerStudent = '/auth/student/register';
+  static const String registerStudent = '/students/register';
   static const String loginStudent    = '/auth/student/login';
   static const String loginFaculty    = '/auth/faculty/login';
   static const String loginAdmin      = '/auth/admin/login';

@@ -92,8 +92,8 @@ class AuthService extends GetxService {
   }) async {
     try {
       final response = await _apiService.dio.post(ApiConstants.registerStudent, data: {
-        'name': name,
-        'roll_no': rollNo,
+        'full_name': name,
+        'roll_number': rollNo,
         'email': email,
         'password': password,
         'department': department,

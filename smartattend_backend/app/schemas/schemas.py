@@ -104,11 +104,11 @@ class LivenessVerifyResponse(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SessionCreate(BaseModel):
-    subject_name: str = Field(..., max_length=100)
-    classroom: str = Field(..., max_length=50)
-    session_code: str = Field(..., max_length=50)
-    start_time: datetime
-    end_time: datetime
+    subject_name: Optional[str] = Field(None, max_length=100)
+    classroom: Optional[str] = Field(None, max_length=50)
+    session_code: Optional[str] = Field(None, max_length=50)
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
     subject_id: Optional[int] = None
     classroom_id: Optional[int] = None
 

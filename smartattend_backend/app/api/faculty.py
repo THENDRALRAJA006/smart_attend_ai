@@ -99,15 +99,43 @@ def create_attendance_session(
         AttendanceSession.is_active == True,
     ).update({"is_active": False, "end_time": now})
 
+    subject_name = payload.subject_name
+    classroom = payload.classroom
+    session_code = payload.session_code
+    start_time = payload.start_time or now
+    end_time = payload.end_time or (start_time + timedelta(hours=1))
+
+    # Resolve from relational IDs if strings not provided
+    if payload.subject_id and not subject_name:
+        from app.models.models import Subject
+        subj = db.query(Subject).filter(Subject.id == payload.subject_id).first()
+        if subj:
+            subject_name = subj.subject_name
+
+    if payload.classroom_id and not classroom:
+        from app.models.models import Classroom
+        cls = db.query(Classroom).filter(Classroom.id == payload.classroom_id).first()
+        if cls:
+            classroom = cls.room_name
+
+    if not subject_name:
+        subject_name = "Class Session"
+    if not classroom:
+        classroom = "Standard Classroom"
+
+    if not session_code:
+        import uuid
+        session_code = f"SESS-{uuid.uuid4().hex[:8].upper()}"
+
     new_session = AttendanceSession(
         faculty_id=current_faculty.id,
-        subject_name=payload.subject_name,
-        classroom=payload.classroom,
-        session_code=payload.session_code,
+        subject_name=subject_name,
+        classroom=classroom,
+        session_code=session_code,
         subject_id=payload.subject_id,
         classroom_id=payload.classroom_id,
-        start_time=payload.start_time,
-        end_time=payload.end_time,
+        start_time=start_time,
+        end_time=end_time,
         is_active=True,
     )
     db.add(new_session)
