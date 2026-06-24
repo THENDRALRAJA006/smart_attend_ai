@@ -1,1 +1,2 @@
-# SmartAttend AI — Utils Package
+# -*- coding: utf-8 -*-
+# SmartAttend AI - Utils Package
