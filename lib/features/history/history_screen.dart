@@ -42,13 +42,9 @@ class StudentDashboardController extends GetxController {
 
   Future<void> _fetchHistory() async {
     try {
-      final studentIdStr = authService.currentUser['id'];
-      if (studentIdStr != null) {
-        final studentId = int.tryParse(studentIdStr) ?? 0;
-        final response = await _apiService.dio.get(ApiConstants.attendanceHistory(studentId));
-        if (response.statusCode == 200) {
-          attendanceHistory.value = response.data;
-        }
+      final response = await _apiService.dio.get(ApiConstants.attendanceHistory);
+      if (response.statusCode == 200) {
+        attendanceHistory.value = response.data;
       }
     } catch (e) {
       // Interceptor alerts

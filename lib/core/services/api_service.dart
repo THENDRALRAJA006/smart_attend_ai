@@ -53,6 +53,11 @@ class ApiService extends getx.GetxService {
             );
           }
         } else {
+          // Do not show error banners for 404 (Not Found) as it's a normal response for checking active states
+          if (error.response?.statusCode == 404) {
+            return handler.next(error);
+          }
+          
           // General Network Error Banner
           String errorMsg = 'An unexpected network error occurred.';
           if (error.type == DioExceptionType.connectionTimeout) {

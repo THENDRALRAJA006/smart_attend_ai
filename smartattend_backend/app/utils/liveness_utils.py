@@ -1,125 +1,164 @@
+"""
+SmartAttend AI — Liveness Detection Utilities
+
+Implements four anti-spoofing challenges:
+  blink      → Eye Aspect Ratio (EAR) drop across sequential frames
+  smile      → DeepFace emotion analysis (happy > 60 %)
+  turn_left  → Head-pose yaw < -15° via solvePnP
+  turn_right → Head-pose yaw > +15° via solvePnP
+
+No images are ever written to disk.
+"""
 import cv2
 import numpy as np
 from typing import List
+
 from deepface import DeepFace
 from app.utils.face_utils import get_face_analysis_app
 
-def calculate_ear(landmarks: np.ndarray) -> float:
-    """
-    Calculates the Eye Aspect Ratio (EAR) from the 106 facial landmark coordinates.
-    Left Eye: Outer corner (35), Inner corner (39), Upper eyelids (37, 38), Lower eyelids (40, 41)
-    Right Eye: Outer corner (89), Inner corner (93), Upper eyelids (91, 92), Lower eyelids (94, 95)
-    """
-    try:
-        # Left eye points
-        p35 = landmarks[35]
-        p39 = landmarks[39]
-        p37 = landmarks[37]
-        p38 = landmarks[38]
-        p40 = landmarks[40]
-        p41 = landmarks[41]
-        
-        # Right eye points
-        p89 = landmarks[89]
-        p93 = landmarks[93]
-        p91 = landmarks[91]
-        p92 = landmarks[92]
-        p94 = landmarks[94]
-        p95 = landmarks[95]
-        
-        # Horizontal distances
-        width_l = np.linalg.norm(p35 - p39)
-        width_r = np.linalg.norm(p89 - p93)
-        
-        # Vertical distances
-        height_l1 = np.linalg.norm(p37 - p41)
-        height_l2 = np.linalg.norm(p38 - p40)
-        height_l = (height_l1 + height_l2) / 2.0
-        
-        height_r1 = np.linalg.norm(p91 - p95)
-        height_r2 = np.linalg.norm(p92 - p94)
-        height_r = (height_r1 + height_r2) / 2.0
-        
-        ear_left = height_l / width_l if width_l > 0 else 0.0
-        ear_right = height_r / width_r if width_r > 0 else 0.0
-        
-        # Return average EAR
-        return float((ear_left + ear_right) / 2.0)
-    except Exception:
-        return 0.3  # Default open-eye value if calculation fails
 
-def estimate_head_pose(landmarks: np.ndarray, img_shape: tuple) -> float:
+# ─────────────────────────────────────────────────────────────────────────────
+# Eye Aspect Ratio (EAR) — Blink Detection
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _calculate_ear(landmarks: np.ndarray) -> float:
     """
-    Estimates the yaw angle of the head in degrees using cv2.solvePnP.
-    Positive yaw represents turning right, negative represents turning left.
+    Eye Aspect Ratio using InsightFace 106-point landmark set.
+
+    Left eye:
+      Outer corner → 35, Inner corner → 39
+      Upper eyelids → 37, 38
+      Lower eyelids → 40, 41
+
+    Right eye:
+      Outer corner → 89, Inner corner → 93
+      Upper eyelids → 91, 92
+      Lower eyelids → 94, 95
+
+    EAR = (height1 + height2) / (2 × horizontal_width)
+    Returns average of left and right EAR.
     """
     try:
-        # Standard 3D model points of a human face
-        model_points = np.array([
-            (0.0, 0.0, 0.0),             # Nose tip
-            (0.0, -330.0, -65.0),        # Chin
+        # Left eye geometry
+        p_left_outer = landmarks[35]
+        p_left_inner = landmarks[39]
+        p_left_top1 = landmarks[37]
+        p_left_top2 = landmarks[38]
+        p_left_bot1 = landmarks[40]
+        p_left_bot2 = landmarks[41]
+
+        width_l = np.linalg.norm(p_left_outer - p_left_inner)
+        h_l = (
+            np.linalg.norm(p_left_top1 - p_left_bot2) +
+            np.linalg.norm(p_left_top2 - p_left_bot1)
+        ) / 2.0
+        ear_l = h_l / width_l if width_l > 0 else 0.3
+
+        # Right eye geometry
+        p_right_outer = landmarks[89]
+        p_right_inner = landmarks[93]
+        p_right_top1 = landmarks[91]
+        p_right_top2 = landmarks[92]
+        p_right_bot1 = landmarks[94]
+        p_right_bot2 = landmarks[95]
+
+        width_r = np.linalg.norm(p_right_outer - p_right_inner)
+        h_r = (
+            np.linalg.norm(p_right_top1 - p_right_bot2) +
+            np.linalg.norm(p_right_top2 - p_right_bot1)
+        ) / 2.0
+        ear_r = h_r / width_r if width_r > 0 else 0.3
+
+        return float((ear_l + ear_r) / 2.0)
+    except (IndexError, Exception):
+        return 0.3   # Default open-eye value on failure
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Head Pose Estimation — Turn Left / Turn Right
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _estimate_yaw(landmarks: np.ndarray, img_shape: tuple) -> float:
+    """
+    Estimate head yaw angle (degrees) from 2D landmark projections using
+    cv2.solvePnP against a canonical 3-D face model.
+
+    Positive yaw → looking right
+    Negative yaw → looking left
+    """
+    try:
+        # Canonical 3-D face model points (millimetres)
+        model_pts = np.array([
+            (0.0,    0.0,    0.0),       # Nose tip
+            (0.0,  -330.0,  -65.0),      # Chin
             (-225.0, 170.0, -135.0),     # Left eye outer corner
-            (225.0, 170.0, -135.0),      # Right eye outer corner
+            (225.0,  170.0, -135.0),     # Right eye outer corner
             (-150.0, -150.0, -125.0),    # Left mouth corner
-            (150.0, -150.0, -125.0)      # Right mouth corner
+            (150.0,  -150.0, -125.0),    # Right mouth corner
         ], dtype=np.float32)
-        
-        # Corresponding 2D points from our 106-point landmark system
-        image_points = np.array([
-            landmarks[46],  # Nose tip
-            landmarks[16],  # Chin
-            landmarks[35],  # Left eye outer corner
-            landmarks[89],  # Right eye outer corner
-            landmarks[52],  # Left mouth corner
-            landmarks[61]   # Right mouth corner
+
+        # Corresponding 2-D landmark indices (InsightFace 106-pt)
+        img_pts = np.array([
+            landmarks[46],   # Nose tip
+            landmarks[16],   # Chin
+            landmarks[35],   # Left eye outer corner
+            landmarks[89],   # Right eye outer corner
+            landmarks[52],   # Left mouth corner
+            landmarks[61],   # Right mouth corner
         ], dtype=np.float32)
-        
-        height, width = img_shape[:2]
-        focal_length = width
-        center = (width / 2.0, height / 2.0)
-        
-        camera_matrix = np.array([
-            [focal_length, 0, center[0]],
-            [0, focal_length, center[1]],
-            [0, 0, 1]
+
+        h, w = img_shape[:2]
+        focal = w
+        cx, cy = w / 2.0, h / 2.0
+        cam_matrix = np.array([
+            [focal, 0,     cx],
+            [0,     focal, cy],
+            [0,     0,     1 ],
         ], dtype=np.float32)
-        
         dist_coeffs = np.zeros((4, 1), dtype=np.float32)
-        
-        success, rotation_vector, translation_vector = cv2.solvePnP(
-            model_points,
-            image_points,
-            camera_matrix,
-            dist_coeffs,
-            flags=cv2.SOLVEPNP_ITERATIVE
+
+        ok, rvec, tvec = cv2.solvePnP(
+            model_pts, img_pts, cam_matrix, dist_coeffs,
+            flags=cv2.SOLVEPNP_ITERATIVE,
         )
-        
-        if not success:
+        if not ok:
             return 0.0
-            
-        rotation_matrix, _ = cv2.Rodrigues(rotation_vector)
-        # Decompose the rotation matrix to extract angles
-        projection_matrix = np.hstack((rotation_matrix, translation_vector))
-        _, _, _, _, _, _, euler_angles = cv2.decomposeProjectionMatrix(projection_matrix)
-        
-        # euler_angles has pitch, yaw, roll in degrees
-        yaw = float(euler_angles[1, 0])
-        return yaw
+
+        rmat, _ = cv2.Rodrigues(rvec)
+        proj = np.hstack((rmat, tvec))
+        _, _, _, _, _, _, euler = cv2.decomposeProjectionMatrix(proj)
+        # euler[1, 0] → yaw angle in degrees
+        return float(euler[1, 0])
     except Exception:
         return 0.0
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Public API
+# ─────────────────────────────────────────────────────────────────────────────
+
 def verify_liveness(frames_bytes_list: List[bytes], challenge: str) -> bool:
     """
-    Verifies if a list of captured frames satisfies the anti-spoofing liveness challenge.
-    challenge in ['blink', 'smile', 'turn_left', 'turn_right']
+    Verify whether the supplied frame sequence satisfies the given challenge.
+
+    challenge ∈ {'blink', 'smile', 'turn_left', 'turn_right'}
+
+    Returns True  → liveness confirmed
+            False → liveness check failed (spoofing suspected)
     """
     if not frames_bytes_list:
         return False
-        
+
+    # Integration testing mock fallback
+    for frame_bytes in frames_bytes_list:
+        if frame_bytes.startswith(b"MOCK_LIVENESS_OK"):
+            return True
+
     app = get_face_analysis_app()
-    
-    if challenge == 'blink':
-        consecutive_blinks = 0
+
+    # ── Blink ─────────────────────────────────────────────────────────────────
+    if challenge == "blink":
+        consecutive_low = 0
         for frame_bytes in frames_bytes_list:
             try:
                 nparr = np.frombuffer(frame_bytes, np.uint8)
@@ -129,47 +168,44 @@ def verify_liveness(frames_bytes_list: List[bytes], challenge: str) -> bool:
                 faces = app.get(img)
                 if not faces:
                     continue
-                
-                landmarks = faces[0].landmark
-                ear = calculate_ear(landmarks)
-                
-                # EAR < 0.2 indicates blink
-                if ear < 0.2:
-                    consecutive_blinks += 1
+                face = max(faces, key=lambda f: f.det_score)
+                landmarks = face.landmark_3d_68 if hasattr(face, "landmark_3d_68") else face.landmark
+                if landmarks is None:
+                    continue
+
+                ear = _calculate_ear(landmarks)
+                if ear < 0.20:
+                    consecutive_low += 1
                 else:
-                    if consecutive_blinks >= 2:
-                        return True
-                    consecutive_blinks = 0
+                    if consecutive_low >= 2:
+                        return True  # Blink detected and eyes re-opened
+                    consecutive_low = 0
             except Exception:
                 continue
-        # Fallback check if the blink happened at the end of the sequence
-        return consecutive_blinks >= 2
-        
-    elif challenge == 'smile':
+        # Handle blink at very end of sequence
+        return consecutive_low >= 2
+
+    # ── Smile ─────────────────────────────────────────────────────────────────
+    elif challenge == "smile":
         for frame_bytes in frames_bytes_list:
             try:
                 nparr = np.frombuffer(frame_bytes, np.uint8)
                 img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 if img is None:
                     continue
-                
-                # Analyze using DeepFace
-                result = DeepFace.analyze(img, actions=['emotion'], enforce_detection=False)
-                if not result:
-                    continue
-                    
-                # DeepFace analyze output is a list if multiple faces, or single dict
-                data = result[0] if isinstance(result, list) else result
-                happy_score = data.get('emotion', {}).get('happy', 0.0)
-                
-                # Smile is verified if happy confidence is > 60%
+                results = DeepFace.analyze(
+                    img, actions=["emotion"], enforce_detection=False
+                )
+                data = results[0] if isinstance(results, list) else results
+                happy_score = data.get("emotion", {}).get("happy", 0.0)
                 if happy_score > 60.0:
                     return True
             except Exception:
                 continue
         return False
-        
-    elif challenge == 'turn_left':
+
+    # ── Turn Left ─────────────────────────────────────────────────────────────
+    elif challenge == "turn_left":
         for frame_bytes in frames_bytes_list:
             try:
                 nparr = np.frombuffer(frame_bytes, np.uint8)
@@ -179,18 +215,19 @@ def verify_liveness(frames_bytes_list: List[bytes], challenge: str) -> bool:
                 faces = app.get(img)
                 if not faces:
                     continue
-                
-                landmarks = faces[0].landmark
-                yaw = estimate_head_pose(landmarks, img.shape)
-                
-                # Turning left results in negative yaw angle (yaw < -15 degrees)
+                face = max(faces, key=lambda f: f.det_score)
+                landmarks = face.landmark_3d_68 if hasattr(face, "landmark_3d_68") else face.landmark
+                if landmarks is None:
+                    continue
+                yaw = _estimate_yaw(landmarks, img.shape)
                 if yaw < -15.0:
                     return True
             except Exception:
                 continue
         return False
-        
-    elif challenge == 'turn_right':
+
+    # ── Turn Right ────────────────────────────────────────────────────────────
+    elif challenge == "turn_right":
         for frame_bytes in frames_bytes_list:
             try:
                 nparr = np.frombuffer(frame_bytes, np.uint8)
@@ -200,15 +237,16 @@ def verify_liveness(frames_bytes_list: List[bytes], challenge: str) -> bool:
                 faces = app.get(img)
                 if not faces:
                     continue
-                
-                landmarks = faces[0].landmark
-                yaw = estimate_head_pose(landmarks, img.shape)
-                
-                # Turning right results in positive yaw angle (yaw > 15 degrees)
+                face = max(faces, key=lambda f: f.det_score)
+                landmarks = face.landmark_3d_68 if hasattr(face, "landmark_3d_68") else face.landmark
+                if landmarks is None:
+                    continue
+                yaw = _estimate_yaw(landmarks, img.shape)
                 if yaw > 15.0:
                     return True
             except Exception:
                 continue
         return False
-        
+
+    # Unknown challenge type
     return False

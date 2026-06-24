@@ -1,41 +1,51 @@
+/// SmartAttend AI — API Endpoint Constants
+///
+/// baseUrl: Update for your Render deployment URL.
+/// All paths must match the FastAPI router prefixes.
 class ApiConstants {
-  // Default URL matches the Android Emulator mapping to localhost.
-  // Change to your production Render URL (e.g. https://smartattend-backend.onrender.com) for production.
+  // ── Base URL ─────────────────────────────────────────────────────────────
+  // Android emulator: use 10.0.2.2 to reach localhost
+  // Physical device: use your machine's local IP or Render URL
+  // Production: https://your-app.onrender.com
   static String baseUrl = 'http://10.0.2.2:8000';
 
-  // Auth routes matching PostgreSQL endpoints
-  static const String registerStudent = '/register/student';
-  static const String loginStudent = '/login/student';
-  static const String loginFaculty = '/login/faculty';
-  static const String loginAdmin = '/login/student'; // Fallback mapping
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  static const String registerStudent = '/auth/student/register';
+  static const String loginStudent    = '/auth/student/login';
+  static const String loginFaculty    = '/auth/faculty/login';
+  static const String loginAdmin      = '/auth/admin/login';
 
-  // Face Registration routes
+  // ── Face Registration ─────────────────────────────────────────────────────
   static const String faceRegister = '/face/register';
-  static const String faceStatus = '/face/status';
-  static const String faceReset = '/face/reset';
+  static const String faceStatus   = '/face/status';
+  static const String faceReset    = '/face/reset';
 
-  // Liveness check routes
+  // ── Liveness ──────────────────────────────────────────────────────────────
   static const String livenessChallenge = '/liveness/challenge';
-  static const String livenessVerify = '/liveness/verify';
+  static const String livenessVerify    = '/liveness/verify';
 
-  // Attendance routes matching PostgreSQL endpoints
-  static const String attendanceVerify = '/attendance/mark'; // Maps to mark/verify on backend
-  static String attendanceHistory(int studentId) => '/attendance/student/$studentId';
-  static String sessionLive(int sessionId) => '/attendance/session/$sessionId';
+  // ── Attendance ────────────────────────────────────────────────────────────
+  static const String attendanceVerify  = '/attendance/verify';
+  static const String attendanceHistory = '/attendance/history';
+  static String sessionAttendance(int sessionId) => '/attendance/session/$sessionId';
 
-  // Faculty session routes
-  static const String sessionCreate = '/faculty/session/create';
-  static String sessionEnd(int id) => '/faculty/session/$id/end';
-  static const String sessionActive = '/faculty/session/active';
-  static String sessionQR(int id) => '/faculty/session/$id/qr';
+  // ── Faculty ───────────────────────────────────────────────────────────────
+  static const String sessionCreate   = '/faculty/session/create';
+  static String sessionEnd(int id)    => '/faculty/session/$id/end';
+  static const String sessionActive   = '/faculty/session/active';
+  static String sessionQR(int id)     => '/faculty/session/$id/qr';
   static String sessionReport(int id) => '/faculty/report/$id';
-  static const String manualReview = '/faculty/attendance/review';
+  static String sessionLive(int id)   => '/faculty/live/$id';
+  static const String manualReview    = '/faculty/attendance/review';
 
-  // Admin routes
-  static const String adminStudents = '/admin/students';
-  static const String adminFaculty = '/admin/faculty';
-  static const String adminSubjects = '/admin/students'; // Safe fallback mapping
+  // ── Admin ─────────────────────────────────────────────────────────────────
+  static const String adminStudents   = '/admin/students';
+  static const String adminFaculty    = '/admin/faculty';
+  static const String adminSubjects   = '/admin/subjects';
   static const String adminClassrooms = '/admin/classrooms';
-  static const String adminBeacons = '/admin/beacons';
-  static const String adminAnalytics = '/admin/analytics';
+  static const String adminBeacons    = '/admin/beacons';
+  static const String adminAnalytics  = '/admin/analytics';
+
+  // ── BLE ───────────────────────────────────────────────────────────────────
+  static const String bleBeacons = '/admin/beacons';
 }

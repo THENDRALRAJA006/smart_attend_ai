@@ -1,81 +1,113 @@
-"""seed_data
-
-Revision ID: 002
-Revises: 001
-Create Date: 2026-06-23 15:30:00.000000
-
+"""
+SmartAttend AI — Seed Data Migration
+Revision: 002
+Seeds: default admin, sample classroom, sample BLE beacon, sample subjects, sample faculty.
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.sql import table, column
+from datetime import datetime
 import bcrypt
-from datetime import datetime, timedelta
 
-# revision identifiers, used by Alembic.
-revision = '002'
-down_revision = '001'
+revision = "002_seed_data"
+down_revision = "001_initial_schema"
 branch_labels = None
 depends_on = None
 
-def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+
+def _hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
 
 def upgrade() -> None:
-    faculty_hash = hash_password("Faculty@123")
-    student_hash = hash_password("Student@123")
+    bind = op.get_bind()
 
-    # 1. Insert default Faculty
-    op.execute(
+    # ── Default Admin ─────────────────────────────────────────────────────────
+    bind.execute(
         sa.text(
-            f"INSERT INTO faculty (name, employee_id, email, password_hash) VALUES "
-            f"('Dr. Sarah Connor', 'FAC-CS-101', 'faculty@smartattend.ai', '{faculty_hash}')"
-        )
+            "INSERT IGNORE INTO admins (email, password_hash, name) VALUES "
+            "(:email, :pw, :name)"
+        ),
+        {
+            "email": "admin@smartattend.ai",
+            "pw": _hash("Admin@2026"),
+            "name": "System Administrator",
+        },
     )
 
-    # 2. Insert default Student
-    op.execute(
-        sa.text(
-            f"INSERT INTO students (full_name, roll_number, department, year, section, email, password_hash, face_embeddings) VALUES "
-            f"('John Doe', 'CS-2026-101', 'Computer Science', 3, 'A', 'student@smartattend.ai', '{student_hash}', '[]')"
+    # ── Sample Classrooms ─────────────────────────────────────────────────────
+    for room_name, building, cap in [
+        ("ROOM101", "Main Block", 60),
+        ("ROOM102", "Main Block", 60),
+        ("ROOM201", "Science Block", 45),
+        ("LAB301",  "Lab Block",   30),
+    ]:
+        bind.execute(
+            sa.text(
+                "INSERT IGNORE INTO classrooms (room_name, building, capacity) "
+                "VALUES (:rn, :b, :c)"
+            ),
+            {"rn": room_name, "b": building, "c": cap},
         )
+
+    # Fetch ROOM101 id
+    row = bind.execute(
+        sa.text("SELECT id FROM classrooms WHERE room_name = 'ROOM101' LIMIT 1")
+    ).fetchone()
+    room101_id = row[0] if row else 1
+
+    # ── Sample BLE Beacon for ROOM101 ─────────────────────────────────────────
+    bind.execute(
+        sa.text(
+            "INSERT IGNORE INTO ble_beacons (classroom_id, uuid, device_name, rssi_threshold, is_active) "
+            "VALUES (:cid, :uuid, :dn, :rssi, 1)"
+        ),
+        {
+            "cid": room101_id,
+            "uuid": "SMARTATTEND-ROOM101-ESP32-001",
+            "dn": "SMARTATTEND_ROOM101",
+            "rssi": -70,
+        },
     )
 
-    # 3. Insert default Classroom
-    op.execute(
-        sa.text(
-            "INSERT INTO classrooms (room_name, building, capacity) VALUES "
-            "('ROOM101', 'Science Block', 60)"
+    # ── Sample Subjects ───────────────────────────────────────────────────────
+    subjects = [
+        ("Data Structures", "CS201", "Computer Science", 2),
+        ("Database Systems", "CS301", "Computer Science", 3),
+        ("Machine Learning", "CS401", "Computer Science", 4),
+        ("Operating Systems", "CS302", "Computer Science", 3),
+        ("Computer Networks", "CS303", "Computer Science", 3),
+    ]
+    for subject_name, code, dept, year in subjects:
+        bind.execute(
+            sa.text(
+                "INSERT IGNORE INTO subjects (subject_name, subject_code, department, year) "
+                "VALUES (:sn, :sc, :dept, :yr)"
+            ),
+            {"sn": subject_name, "sc": code, "dept": dept, "yr": year},
         )
+
+    # ── Sample Faculty ────────────────────────────────────────────────────────
+    bind.execute(
+        sa.text(
+            "INSERT IGNORE INTO faculty (name, email, password_hash, department) "
+            "VALUES (:name, :email, :pw, :dept)"
+        ),
+        {
+            "name": "Dr. Sample Faculty",
+            "email": "faculty@smartattend.ai",
+            "pw": _hash("Faculty@123"),
+            "dept": "Computer Science",
+        },
     )
 
-    # 4. Insert default BLE Beacon (linked to ROOM101)
-    op.execute(
-        sa.text(
-            "INSERT INTO ble_beacons (classroom_id, uuid, device_name, rssi_threshold, is_active) VALUES "
-            "((SELECT id FROM classrooms WHERE room_name = 'ROOM101' LIMIT 1), "
-            "'FDA5EDD4-C2EF-47F1-8FF5-3D3271F3637F', 'ESP32-ROOM101', -75, true)"
-        )
-    )
+    print("[Seed] [OK] SmartAttend AI seed data inserted successfully.")
 
-    # 5. Insert default Active Session
-    # Set start_time to now (UTC) and end_time to +3 hours for convenience
-    start_time = datetime.utcnow()
-    end_time = start_time + timedelta(hours=3)
-    
-    start_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
-    end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
-
-    op.execute(
-        sa.text(
-            f"INSERT INTO sessions (faculty_id, subject_name, classroom, session_code, start_time, end_time) VALUES "
-            f"((SELECT id FROM faculty LIMIT 1), 'Artificial Intelligence', 'ROOM101', 'SESS-AI-301', '{start_str}', '{end_str}')"
-        )
-    )
 
 def downgrade() -> None:
-    op.execute(sa.text("DELETE FROM ble_beacons"))
-    op.execute(sa.text("DELETE FROM classrooms"))
-    op.execute(sa.text("DELETE FROM sessions"))
-    op.execute(sa.text("DELETE FROM students"))
-    op.execute(sa.text("DELETE FROM faculty"))
-
+    bind = op.get_bind()
+    bind.execute(sa.text("DELETE FROM ble_beacons WHERE uuid = 'SMARTATTEND-ROOM101-ESP32-001'"))
+    bind.execute(sa.text("DELETE FROM classrooms WHERE room_name IN ('ROOM101','ROOM102','ROOM201','LAB301')"))
+    bind.execute(sa.text("DELETE FROM admins WHERE email = 'admin@smartattend.ai'"))
+    bind.execute(sa.text("DELETE FROM faculty WHERE email = 'faculty@smartattend.ai'"))
+    bind.execute(sa.text("DELETE FROM subjects WHERE subject_code IN ('CS201','CS301','CS401','CS302','CS303')"))

@@ -1,47 +1,88 @@
+"""
+SmartAttend AI — SQLAlchemy ORM Models (MySQL 8.0 / AWS RDS)
+
+All tables match Section 4 of the specification exactly.
+No images are ever stored — embeddings only.
+"""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, ForeignKey, JSON
+from sqlalchemy import (
+    Column, Integer, String, Boolean, DateTime, Date, Time,
+    Float, ForeignKey, Enum, Text, Index, UniqueConstraint
+)
 from sqlalchemy.orm import relationship
 from app.database.database import Base
 
+
+# ── Students ─────────────────────────────────────────────────────────────────
 class Student(Base):
     __tablename__ = "students"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    full_name = Column(String(100), nullable=False)
-    roll_number = Column(String(50), unique=True, nullable=False)
-    department = Column(String(100), nullable=True)
+    name = Column(String(100), nullable=False)
+    roll_no = Column(String(20), unique=True, nullable=False)
+    department = Column(String(50), nullable=True)
     year = Column(Integer, nullable=True)
-    section = Column(String(20), nullable=True)
+    section = Column(String(10), nullable=True)
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    is_face_registered = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    attendances = relationship("AttendanceRecord", back_populates="student", cascade="all, delete-orphan")
-    face_embeddings = relationship("FaceEmbedding", back_populates="student", cascade="all, delete-orphan")
-    liveness_tokens = relationship("LivenessToken", back_populates="student", cascade="all, delete-orphan")
+    face_embeddings = relationship(
+        "FaceEmbedding", back_populates="student",
+        cascade="all, delete-orphan"
+    )
+    attendances = relationship(
+        "Attendance", back_populates="student",
+        cascade="all, delete-orphan"
+    )
+    liveness_tokens = relationship(
+        "LivenessToken", back_populates="student",
+        cascade="all, delete-orphan"
+    )
 
+
+# ── Faculty ──────────────────────────────────────────────────────────────────
 class Faculty(Base):
     __tablename__ = "faculty"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(100), nullable=False)
-    employee_id = Column(String(50), unique=True, nullable=False)
+    name = Column(String(100), nullable=True)
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    department = Column(String(50), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    sessions = relationship("AttendanceSession", back_populates="faculty", cascade="all, delete-orphan")
+    sessions = relationship(
+        "AttendanceSession", back_populates="faculty",
+        cascade="all, delete-orphan"
+    )
 
+
+# ── Admins ───────────────────────────────────────────────────────────────────
 class Admin(Base):
     __tablename__ = "admins"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    name = Column(String(100), nullable=True)
 
+
+# ── Subjects ─────────────────────────────────────────────────────────────────
+class Subject(Base):
+    __tablename__ = "subjects"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    subject_name = Column(String(100), nullable=True)
+    subject_code = Column(String(20), unique=True, nullable=True)
+    department = Column(String(50), nullable=True)
+    year = Column(Integer, nullable=True)
+
+
+# ── Classrooms ───────────────────────────────────────────────────────────────
 class Classroom(Base):
     __tablename__ = "classrooms"
 
@@ -51,13 +92,23 @@ class Classroom(Base):
     capacity = Column(Integer, nullable=True)
 
     # Relationships
-    beacons = relationship("BleBeacon", back_populates="classroom", cascade="all, delete-orphan")
+    beacons = relationship(
+        "BleBeacon", back_populates="classroom",
+        cascade="all, delete-orphan"
+    )
+    sessions = relationship(
+        "AttendanceSession", back_populates="classroom_rel"
+    )
 
+
+# ── BLE Beacons ──────────────────────────────────────────────────────────────
 class BleBeacon(Base):
     __tablename__ = "ble_beacons"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    classroom_id = Column(Integer, ForeignKey("classrooms.id", ondelete="CASCADE"), nullable=False)
+    classroom_id = Column(
+        Integer, ForeignKey("classrooms.id", ondelete="CASCADE"), nullable=False
+    )
     uuid = Column(String(100), unique=True, nullable=False)
     device_name = Column(String(100), nullable=True)
     rssi_threshold = Column(Integer, default=-70)
@@ -66,54 +117,111 @@ class BleBeacon(Base):
     # Relationships
     classroom = relationship("Classroom", back_populates="beacons")
 
+
+# ── Attendance Sessions ───────────────────────────────────────────────────────
 class AttendanceSession(Base):
-    __tablename__ = "sessions"  # keep table name as 'sessions' to preserve existing migration mapping
+    __tablename__ = "attendance_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    faculty_id = Column(Integer, ForeignKey("faculty.id", ondelete="CASCADE"), nullable=False)
-    subject_name = Column(String(100), nullable=False)
-    classroom = Column(String(50), nullable=False)
-    session_code = Column(String(50), unique=True, nullable=False)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
+    faculty_id = Column(
+        Integer, ForeignKey("faculty.id", ondelete="CASCADE"), nullable=False
+    )
+    subject_id = Column(
+        Integer, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    classroom_id = Column(
+        Integer, ForeignKey("classrooms.id", ondelete="SET NULL"), nullable=True
+    )
+    is_active = Column(Boolean, default=True)
+    start_time = Column(DateTime, default=datetime.utcnow)
+    end_time = Column(DateTime, nullable=True)
+    qr_token = Column(String(255), nullable=True)
+    qr_expires_at = Column(DateTime, nullable=True)
+
+    # Legacy fields for backwards compatibility
+    subject_name = Column(String(100), nullable=True)
+    classroom = Column(String(50), nullable=True)
+    session_code = Column(String(50), unique=True, nullable=True)
 
     # Relationships
     faculty = relationship("Faculty", back_populates="sessions")
-    attendances = relationship("AttendanceRecord", back_populates="session", cascade="all, delete-orphan")
+    subject_rel = relationship("Subject")
+    classroom_rel = relationship("Classroom", back_populates="sessions", foreign_keys=[classroom_id])
+    attendances = relationship(
+        "Attendance", back_populates="session",
+        cascade="all, delete-orphan"
+    )
 
-class AttendanceRecord(Base):
-    __tablename__ = "attendance"  # keep table name as 'attendance' to preserve existing migration mapping
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
-    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    status = Column(String(20), nullable=False, default="present")  # present, manual_review, rejected
-    verification_method = Column(String(50), nullable=False)  # face, qr, manual
-    similarity_score = Column(Float, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    student = relationship("Student", back_populates="attendances")
-    session = relationship("AttendanceSession", back_populates="attendances")
-
+# ── Face Embeddings ───────────────────────────────────────────────────────────
 class FaceEmbedding(Base):
     __tablename__ = "face_embeddings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
-    embedding = Column(JSON, nullable=False)  # Stored as JSON list of 512 floats
+    student_id = Column(
+        Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False
+    )
+    pose_name = Column(String(50), nullable=True)
+    embedding_json = Column(Text, nullable=False)   # JSON array of 512 floats (LONGTEXT in migration)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     student = relationship("Student", back_populates="face_embeddings")
 
+    __table_args__ = (
+        Index("idx_face_embedding_student", "student_id"),
+    )
+
+
+# ── Attendance Records ────────────────────────────────────────────────────────
+class Attendance(Base):
+    __tablename__ = "attendance"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(
+        Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False
+    )
+    session_id = Column(
+        Integer, ForeignKey("attendance_sessions.id", ondelete="CASCADE"), nullable=False
+    )
+    classroom_id = Column(
+        Integer, ForeignKey("classrooms.id", ondelete="SET NULL"), nullable=True
+    )
+    subject_id = Column(
+        Integer, ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True
+    )
+    date = Column(Date, nullable=False)
+    time = Column(Time, nullable=False)
+    similarity_score = Column(Float, nullable=True)
+    attendance_status = Column(
+        Enum("present", "manual_review", "rejected", name="attendance_status_enum"),
+        default="present"
+    )
+    liveness_verified = Column(Boolean, default=False)
+    marked_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    student = relationship("Student", back_populates="attendances")
+    session = relationship("AttendanceSession", back_populates="attendances")
+
+    __table_args__ = (
+        UniqueConstraint("student_id", "session_id", name="no_duplicate_attendance"),
+    )
+
+
+# ── Liveness Tokens ──────────────────────────────────────────────────────────
 class LivenessToken(Base):
     __tablename__ = "liveness_tokens"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    student_id = Column(
+        Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False
+    )
     token = Column(String(255), unique=True, nullable=False)
-    challenge = Column(String(50), nullable=False)  # blink, smile, turn_left, turn_right
+    challenge = Column(
+        Enum("blink", "smile", "turn_left", "turn_right", name="liveness_challenge_enum"),
+        nullable=False
+    )
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -121,6 +229,7 @@ class LivenessToken(Base):
     # Relationships
     student = relationship("Student", back_populates="liveness_tokens")
 
-# Backwards compatibility aliases
+
+# ── Backwards-compatibility aliases ──────────────────────────────────────────
+AttendanceRecord = Attendance
 Session = AttendanceSession
-Attendance = AttendanceRecord

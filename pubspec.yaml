@@ -1,8 +1,8 @@
 name: smart_attend_ai
-description: "SmartAttend AI College Attendance System Mobile App"
+description: "SmartAttend AI — Production College Attendance System with BLE + ArcFace"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 3.0.0+3
 
 environment:
   sdk: ^3.12.2
@@ -11,35 +11,38 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  
-  # State management & routing
+
+  # ── State Management, Routing & DI ─────────────────────────────────
   get: ^4.6.6
-  
-  # Networking
+
+  # ── Networking ──────────────────────────────────────────────────────
   dio: ^5.4.1
-  
-  # BLE Beacon Proximity Scanning
+
+  # ── BLE Proximity Scanning ──────────────────────────────────────────
   flutter_blue_plus: ^1.31.1
-  
-  # Selfie Camera
+
+  # ── Camera (selfie + face registration) ────────────────────────────
   camera: ^0.10.5+9
-  
-  # QR Scanner fallback
+
+  # ── QR Code Scanner (attendance fallback) ──────────────────────────
   mobile_scanner: ^5.0.0
-  
-  # Secure Storage for JWT token
+
+  # ── Secure JWT Storage ──────────────────────────────────────────────
   flutter_secure_storage: ^9.0.0
-  
-  # Permissions handler
+
+  # ── Permissions ─────────────────────────────────────────────────────
   permission_handler: ^11.3.1
-  
-  # QR Code generation for Faculty
+
+  # ── QR Code Generation (Faculty) ────────────────────────────────────
   qr_flutter: ^4.1.0
-  
-  # Date formatting
+
+  # ── Share QR Code (Faculty) ─────────────────────────────────────────
+  share_plus: ^7.2.1
+
+  # ── Date & Time Formatting ──────────────────────────────────────────
   intl: ^0.19.0
-  
-  # Local paths for camera frames buffer
+
+  # ── File Paths (camera frame buffer) ───────────────────────────────
   path_provider: ^2.1.2
 
 dev_dependencies:
@@ -49,3 +52,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Uncomment to add custom fonts (requires assets in pubspec)
+  # fonts:
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700

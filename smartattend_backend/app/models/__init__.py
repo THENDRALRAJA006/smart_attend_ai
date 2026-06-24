@@ -2,12 +2,29 @@ from .models import (
     Student,
     Faculty,
     Admin,
+    Subject,
     Classroom,
     BleBeacon,
     AttendanceSession,
-    AttendanceRecord,
     FaceEmbedding,
+    Attendance,
     LivenessToken,
+    # Backwards-compatibility aliases
+    AttendanceRecord,
     Session,
-    Attendance
 )
+
+__all__ = [
+    "Student",
+    "Faculty",
+    "Admin",
+    "Subject",
+    "Classroom",
+    "BleBeacon",
+    "AttendanceSession",
+    "FaceEmbedding",
+    "Attendance",
+    "LivenessToken",
+    "AttendanceRecord",
+    "Session",
+]

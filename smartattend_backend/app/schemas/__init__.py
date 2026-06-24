@@ -17,7 +17,19 @@ from .schemas import (
     AttendanceResponse,
     StudentSchema,
     FacultySchema,
+    SubjectSchema,
     ClassroomSchema,
     BeaconSchema,
-    AnalyticsResponse
+    AnalyticsResponse,
 )
+
+__all__ = [
+    "StudentRegister", "FacultyRegister", "LoginRequest",
+    "TokenSchema", "UserProfileSchema", "LoginResponse",
+    "FaceStatusResponse", "FaceRegisterPayload", "FaceVerifyPayload", "FaceVerifyResponse",
+    "LivenessChallengeResponse", "LivenessVerifyResponse",
+    "SessionCreate", "SessionResponse",
+    "AttendanceMark", "AttendanceResponse",
+    "StudentSchema", "FacultySchema", "SubjectSchema",
+    "ClassroomSchema", "BeaconSchema", "AnalyticsResponse",
+]

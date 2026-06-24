@@ -1,91 +1,190 @@
 /*
-  SmartAttend AI - BLE Proximity Advertising Beacon for ESP32
-  
-  This firmware configures an ESP32 device to act as an iBeacon/Custom BLE advertiser.
-  The mobile application scans for this beacon to verify the student is physically present 
-  inside the correct classroom room before initiating liveness and face verification checks.
-*/
+ * SmartAttend AI — ESP32 BLE Proximity Beacon
+ * ═════════════════════════════════════════════
+ * Broadcasts a BLE advertising packet that Flutter's flutter_blue_plus
+ * can detect for proximity-based attendance verification.
+ *
+ * Configuration: edit the #define constants below.
+ * Upload via Arduino IDE with "ESP32 Dev Module" board selected.
+ *
+ * Required library: ESP32 BLE Arduino (bundled with esp32 board package)
+ *
+ * Hardware: ESP32 DevKit v1 (or any ESP32 module)
+ * LED_PIN: GPIO2 (built-in LED on most DevKit boards)
+ */
 
 #include <BLEDevice.h>
+#include <BLEServer.h>
 #include <BLEUtils.h>
+#include <BLEAdvertising.h>
 #include <BLEBeacon.h>
+#include <esp_sleep.h>
 
-// --- Configuration Definitions ---
-#define ROOM_NAME "SMARTATTEND_ROOM101"                 // Device name filtered by Flutter app
-#define BEACON_UUID "fda50693-a4e2-4fb1-afcf-c6eb07647825" // Unique Identifier matching DB ble_beacons table
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIGURATION — Edit these values for each room deployment
+// ─────────────────────────────────────────────────────────────────────────────
 
-#define LED_PIN 2            // Status LED (Blinks on startup / advertising cycle)
-#define ADVERTISE_INTERVAL_MS 100 // Fast advertising rate for quick device discovery
+// Device name prefix MUST start with "SMARTATTEND_"
+// Flutter filters by this prefix to identify SmartAttend beacons
+#define ROOM_NAME         "ROOM101"
+#define DEVICE_NAME       "SMARTATTEND_" ROOM_NAME
 
-BLEAdvertising *pAdvertising;
+// Unique UUID per beacon/room (generate at https://www.uuidgenerator.net/)
+#define BEACON_UUID       "12345678-1234-1234-1234-123456789ABC"
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("SmartAttend AI: Starting BLE Beacon initialization...");
+// Major / Minor values (optional — can encode building/floor info)
+#define BEACON_MAJOR      0x0001
+#define BEACON_MINOR      0x0001
 
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH); // Turn LED on during boot
+// TX Power: calibrated measured RSSI at 1 metre
+// -59 dBm is typical. Increase for wider range, decrease for tighter proximity.
+#define TX_POWER          -59
 
-  // 1. Initialize the BLE Device
-  BLEDevice::init(ROOM_NAME);
+// RSSI threshold hint stored in beacon metadata
+// Flutter compares scanned RSSI against this value
+// -70 dBm means student must be within ~5 metres
+#define RSSI_THRESHOLD    -70
 
-  // 2. Create the BLE Server
-  BLEServer *pServer = BLEDevice::createServer();
+// BLE advertising interval (milliseconds)
+// Lower = faster detection, higher battery drain
+#define ADVERTISE_INTERVAL_MS  100
 
-  // 3. Create advertising object
-  pAdvertising = BLEDevice::getAdvertising();
-  
-  // 4. Create and configure iBeacon data structure
-  BLEBeacon oBeacon = BLEBeacon();
-  oBeacon.setManufacturerId(0x4C00); // Apple Manufacturer ID for standard beacon setups
-  oBeacon.setProximityUUID(BLEUUID(BEACON_UUID));
-  oBeacon.setMajor(1);
-  oBeacon.setMinor(1);
-  oBeacon.setSignalPower(-59); // Calibrated TX RSSI at 1 meter distance
+// LED blink config
+#define LED_PIN           2      // GPIO2 = built-in LED on most ESP32 DevKit
+#define LED_ON_MS         50     // blink duration
+#define LED_PERIOD_MS     2000   // blink every N ms
 
-  // 5. Structure BLE advertisement payload
-  BLEAdvertisementData oAdvertisementData = BLEAdvertisementData();
-  oAdvertisementData.setFlags(0x04); // BR_EDR_NOT_SUPPORTED
-  
-  // Set manufacturer data containing the iBeacon properties
+// Deep sleep config (optional power saving — disabled by default)
+#define ENABLE_DEEP_SLEEP false
+#define AWAKE_SECONDS     30     // advertise for this long before sleeping
+#define SLEEP_SECONDS     5      // sleep duration
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GLOBALS
+// ─────────────────────────────────────────────────────────────────────────────
+BLEAdvertising* pAdvertising = nullptr;
+unsigned long lastLedBlink   = 0;
+unsigned long startTime      = 0;
+bool ledState                = false;
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper: configure iBeacon advertising payload
+// ─────────────────────────────────────────────────────────────────────────────
+void configureBeaconAdvertising() {
+  BLEBeacon beacon;
+  beacon.setManufacturerId(0x004C);  // Apple iBeacon manufacturer ID
+  beacon.setProximityUUID(BLEUUID(BEACON_UUID));
+  beacon.setMajor(BEACON_MAJOR);
+  beacon.setMinor(BEACON_MINOR);
+  beacon.setSignalPower(TX_POWER);
+
+  BLEAdvertisementData oAdvertisementData;
+  oAdvertisementData.setFlags(0x04);  // BR_EDR_NOT_SUPPORTED
+
   std::string strServiceData = "";
-  strServiceData += (char)26;     // Len
-  strServiceData += (char)0xFF;   // Type (Manufacturer Specific Data)
-  strServiceData += oBeacon.getData();
-  oAdvertisementData.setManufacturerData(strServiceData);
-  
-  // Set advertising name explicitly so app filters it correctly
-  BLEAdvertisementData oScanResponseData = BLEAdvertisementData();
-  oScanResponseData.setName(ROOM_NAME);
-  
+  strServiceData += (char)26;      // Beacon data length
+  strServiceData += (char)0xFF;    // Type: Manufacturer Specific
+  strServiceData += beacon.getData();
+  oAdvertisementData.addData(strServiceData);
+
+  // Scan response includes device name for flutter_blue_plus name filtering
+  BLEAdvertisementData oScanResponseData;
+  oScanResponseData.setCompleteLocalName(DEVICE_NAME);
+  // Embed RSSI threshold hint as service data (0xFEED = SmartAttend custom UUID)
+  // Format: 2-byte RSSI threshold as signed int16
+  std::string rssiHint = "";
+  rssiHint += (char)0x05;          // Length of service data field
+  rssiHint += (char)0x16;          // Type: Service Data
+  rssiHint += (char)0xED;          // UUID low byte (0xFEED)
+  rssiHint += (char)0xFE;          // UUID high byte
+  rssiHint += (char)(RSSI_THRESHOLD & 0xFF);
+  rssiHint += (char)((RSSI_THRESHOLD >> 8) & 0xFF);
+  oScanResponseData.addData(rssiHint);
+
   pAdvertising->setAdvertisementData(oAdvertisementData);
   pAdvertising->setScanResponseData(oScanResponseData);
-
-  // 6. Tune TX Power settings for stable RSSI readings
-  // ESP32 supports power levels: ESP_PWR_LVL_M12, ESP_PWR_LVL_M9, ESP_PWR_LVL_M6, ESP_PWR_LVL_M3, 
-  // ESP_PWR_LVL_N0, ESP_PWR_LVL_P3, ESP_PWR_LVL_P6, ESP_PWR_LVL_P9
-  esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_DEFAULT, ESP_PWR_LVL_P9); // Maximum range TX
-  esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, ESP_PWR_LVL_P9);
-
-  // Set advertisement interval
-  pAdvertising->setMinInterval(ADVERTISE_INTERVAL_MS / 0.625);
-  pAdvertising->setMaxInterval(ADVERTISE_INTERVAL_MS / 0.625);
-
-  // 7. Start advertising
-  pAdvertising->start();
-  Serial.print("BLE Advertising started. Device Local Name: ");
-  Serial.println(ROOM_NAME);
-  Serial.print("Beacon Service UUID: ");
-  Serial.println(BEACON_UUID);
-
-  digitalWrite(LED_PIN, LOW); // Initial boot complete
 }
 
-void loop() {
-  // Beacon loops and advertises in the background.
-  // LED blinks periodically to indicate advertising heartbeats.
-  digitalWrite(LED_PIN, HIGH);
-  delay(100);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SETUP
+// ─────────────────────────────────────────────────────────────────────────────
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("");
+  Serial.println("╔══════════════════════════════════════════╗");
+  Serial.println("║       SmartAttend AI — BLE Beacon        ║");
+  Serial.println("╠══════════════════════════════════════════╣");
+  Serial.print  ("║  Room:     "); Serial.println(ROOM_NAME);
+  Serial.print  ("║  Device:   "); Serial.println(DEVICE_NAME);
+  Serial.print  ("║  UUID:     "); Serial.println(BEACON_UUID);
+  Serial.print  ("║  RSSI Threshold: "); Serial.println(RSSI_THRESHOLD);
+  Serial.println("╚══════════════════════════════════════════╝");
+
+  // LED setup
+  pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-  delay(900);
+
+  // BLE init
+  BLEDevice::init(DEVICE_NAME);
+  BLEDevice::setPower(ESP_PWR_LVL_P7);  // Max TX power (+7 dBm)
+
+  pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->setMinInterval(ADVERTISE_INTERVAL_MS * 1.6);  // Units: 0.625ms
+  pAdvertising->setMaxInterval(ADVERTISE_INTERVAL_MS * 1.6 + 10);
+
+  configureBeaconAdvertising();
+  pAdvertising->start();
+
+  Serial.println("[BLE] ✅ Beacon advertising started.");
+  Serial.print("[BLE]    Advertising as: "); Serial.println(DEVICE_NAME);
+
+  startTime = millis();
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LOOP
+// ─────────────────────────────────────────────────────────────────────────────
+void loop() {
+  unsigned long now = millis();
+
+  // ── LED heartbeat blink ────────────────────────────────────────────────────
+  if (now - lastLedBlink >= (unsigned long)(ledState ? LED_ON_MS : (LED_PERIOD_MS - LED_ON_MS))) {
+    ledState = !ledState;
+    digitalWrite(LED_PIN, ledState ? HIGH : LOW);
+    lastLedBlink = now;
+  }
+
+  // ── Optional deep-sleep cycle ──────────────────────────────────────────────
+  if (ENABLE_DEEP_SLEEP) {
+    if (now - startTime >= (unsigned long)(AWAKE_SECONDS * 1000)) {
+      Serial.println("[POWER] Going to deep sleep for " + String(SLEEP_SECONDS) + "s...");
+      pAdvertising->stop();
+      digitalWrite(LED_PIN, LOW);
+      esp_sleep_enable_timer_wakeup((uint64_t)SLEEP_SECONDS * 1000000ULL);
+      esp_deep_sleep_start();
+    }
+  }
+
+  // ── Serial command handler ─────────────────────────────────────────────────
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd == "status") {
+      Serial.println("[STATUS] Advertising: " + String(pAdvertising ? "YES" : "NO"));
+      Serial.println("[STATUS] Uptime: " + String(millis() / 1000) + "s");
+      Serial.println("[STATUS] Room: " + String(ROOM_NAME));
+      Serial.println("[STATUS] UUID: " + String(BEACON_UUID));
+    } else if (cmd == "restart") {
+      Serial.println("[CMD] Restarting...");
+      ESP.restart();
+    } else {
+      Serial.println("[CMD] Unknown. Try: status | restart");
+    }
+  }
+
+  delay(10);  // Yield to RTOS scheduler
 }

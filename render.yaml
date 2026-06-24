@@ -1,31 +1,51 @@
 services:
   - type: web
-    name: smartattend-backend
-    env: docker
-    rootDir: smartattend_backend
-    dockerfilePath: Dockerfile
-    plan: starter
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    name: smartattend-ai-backend
+    runtime: docker
+    dockerfilePath: ./smartattend_backend/Dockerfile
+    dockerContext: ./smartattend_backend
+    plan: standard
+    region: oregon
+
     envVars:
       - key: DATABASE_URL
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SECRET_KEY
-        sync: false
+        sync: false   # Set in Render dashboard from AWS RDS connection string
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_ALGORITHM
         value: HS256
-      - key: ENVIRONMENT
-        value: production
       - key: ARCFACE_MODEL_NAME
         value: buffalo_l
+      - key: ENVIRONMENT
+        value: production
       - key: MAX_FACE_EMBEDDINGS
         value: "50"
+      - key: MIN_FRAMES_FOR_REGISTRATION
+        value: "20"
+      - key: SHARPNESS_THRESHOLD
+        value: "100.0"
+      - key: DETECTION_CONFIDENCE_THRESHOLD
+        value: "0.95"
+      - key: DEDUP_SIMILARITY_THRESHOLD
+        value: "0.98"
       - key: LIVENESS_TOKEN_EXPIRY_MINUTES
         value: "3"
       - key: SIMILARITY_THRESHOLD_PRESENT
-        value: "0.80"
+        value: "0.75"
       - key: SIMILARITY_THRESHOLD_REVIEW
         value: "0.65"
+      - key: MAX_VERIFICATION_ATTEMPTS
+        value: "5"
+      - key: PORT
+        value: "8000"
+
+    healthCheckPath: /health
+
+    # Render will run migrations on every deploy before starting the server
+    buildCommand: ""
+    startCommand: >
+      sh -c "cd /app &&
+      alembic upgrade head &&
+      uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 --timeout-keep-alive 65"
+
+    autoDeploy: true

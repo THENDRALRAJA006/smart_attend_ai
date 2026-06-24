@@ -1,1 +1,1 @@
-# app/api package
+# SmartAttend AI — API Router Package

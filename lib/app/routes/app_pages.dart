@@ -9,6 +9,7 @@ import '../../features/attendance/liveness_screen.dart';
 import '../../features/attendance/selfie_screen.dart';
 import '../../features/attendance/attendance_controller.dart';
 import '../../features/history/history_screen.dart';
+import '../../features/history/history_controller.dart';
 import '../../features/faculty/dashboard_screen.dart';
 import '../../features/faculty/create_session_screen.dart';
 import '../../features/faculty/live_attendance_screen.dart';
@@ -34,9 +35,9 @@ class AppPages {
     ),
     GetPage(
       name: Routes.STUDENT_DASHBOARD,
-      page: () => const HistoryScreen(), // History serves as student dashboard
+      page: () => const HistoryScreen(),
       binding: BindingsBuilder(() {
-        // Shared controller or initialized on screen
+        Get.lazyPut<HistoryController>(() => HistoryController());
       }),
     ),
     GetPage(
@@ -56,12 +57,12 @@ class AppPages {
     GetPage(
       name: Routes.LIVENESS,
       page: () => const LivenessScreen(),
-      // Uses the same AttendanceController instance initialized during BLE_SCAN
+      // Uses the AttendanceController instance from BLE_SCAN
     ),
     GetPage(
       name: Routes.SELFIE,
       page: () => const SelfieScreen(),
-      // Uses the same AttendanceController instance
+      // Uses the AttendanceController instance
     ),
     GetPage(
       name: Routes.FACULTY_DASHBOARD,
@@ -73,17 +74,17 @@ class AppPages {
     GetPage(
       name: Routes.FACULTY_CREATE_SESSION,
       page: () => const CreateSessionScreen(),
-      // Uses the same FacultyController
+      // Uses the FacultyController instance
     ),
     GetPage(
       name: Routes.FACULTY_LIVE_ATTENDANCE,
       page: () => const LiveAttendanceScreen(),
-      // Uses the same FacultyController
+      // Uses the FacultyController instance
     ),
     GetPage(
       name: Routes.FACULTY_QR_GENERATE,
       page: () => const QrGenerateScreen(),
-      // Uses the same FacultyController
+      // Uses the FacultyController instance
     ),
     GetPage(
       name: Routes.ADMIN_DASHBOARD,

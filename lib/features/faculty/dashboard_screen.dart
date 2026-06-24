@@ -150,7 +150,7 @@ class FacultyDashboardScreen extends GetView<FacultyController> {
           ),
           const SizedBox(height: 2),
           Text(
-            'Running in Classroom #${session['classroom_id']}',
+            'Running in Classroom ${session['classroom'] ?? 'Unknown'}',
             style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
@@ -230,7 +230,6 @@ class FacultyDashboardScreen extends GetView<FacultyController> {
     final isEnabled = onTap != null;
     return Material(
       color: isEnabled ? const Color(0xFF161722) : const Color(0xFF10111A).withOpacity(0.5),
-      borderRadius: BorderRadius.circular(16),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
