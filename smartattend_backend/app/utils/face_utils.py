@@ -94,26 +94,35 @@ def select_best_embeddings(
     """
     From a list of raw frame bytes select the best `target` ArcFace embeddings.
 
-    Algorithm:
-      1. Reject frames with sharpness ≤ threshold (fast, pre-inference filter)
-      2. Reject faces with det_score < confidence_threshold
-      3. Sort remaining candidates by sharpness descending
-      4. Greedily add embeddings that are NOT too similar (cosine < dedup_threshold)
-         to the already-kept set
-      5. Stop when `target` embeddings are collected
-
-    Returns a list of up to `target` numpy arrays (512-dim float32).
+    Optimized for CPU/Server timeouts:
+      1. Pre-calculate sharpness for all frames (very fast, <1ms per frame).
+      2. Filter and sort frames by sharpness descending (highest quality first).
+      3. Only run expensive face detection (app.get) on the top `target * 1.5` candidates.
+      4. Greedily add embeddings that are NOT too similar (cosine < dedup_threshold).
     """
     app = get_face_analysis_app()
     candidates = []
 
+    # 1. Pre-calculate sharpness for all frames
+    sharpness_list = []
     for frame_bytes in frames:
-        try:
-            # Fast sharpness pre-filter (avoids running ArcFace on blurry frames)
-            sharpness = get_sharpness(frame_bytes)
-            if sharpness <= sharpness_threshold:
-                continue
+        s = get_sharpness(frame_bytes)
+        sharpness_list.append((s, frame_bytes))
 
+    # Sort by sharpness descending
+    sharpness_list.sort(key=lambda x: x[0], reverse=True)
+
+    # Filter by threshold, but if we have too few frames, keep the top ones anyway
+    filtered_list = [item for item in sharpness_list if item[0] > sharpness_threshold]
+    if len(filtered_list) < min(len(frames), target):
+        filtered_list = sharpness_list
+
+    # 2. Only run face detection on the top target * 1.5 candidates
+    max_to_process = min(len(filtered_list), int(target * 1.5))
+
+    for i in range(max_to_process):
+        s, frame_bytes = filtered_list[i]
+        try:
             nparr = np.frombuffer(frame_bytes, np.uint8)
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
             if img is None:
@@ -131,15 +140,12 @@ def select_best_embeddings(
 
             candidates.append({
                 "embedding": face.normed_embedding,
-                "sharpness": sharpness,
+                "sharpness": s,
             })
         except Exception:
             continue  # Skip unprocessable frames silently
 
-    # Sort by sharpness descending (highest quality first)
-    candidates.sort(key=lambda x: x["sharpness"], reverse=True)
-
-    # Greedy deduplication: keep if NOT too similar to any kept embedding
+    # 3. Greedy deduplication: keep if NOT too similar to any kept embedding
     kept: List[dict] = []
     for c in candidates:
         if len(kept) >= target:
