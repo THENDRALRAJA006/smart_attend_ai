@@ -26,14 +26,22 @@ def get_face_analysis_app() -> Any:
     """
     global _face_app
     if _face_app is None:
-        log_memory_usage("Before Lazy loading ArcFace (InsightFace)")
-        from insightface.app import FaceAnalysis
-        _face_app = FaceAnalysis(
-            name=settings.ARCFACE_MODEL_NAME,
-            providers=["CPUExecutionProvider"],
-        )
-        _face_app.prepare(ctx_id=-1, det_size=(640, 640))
-        log_memory_usage("After Lazy loading ArcFace (InsightFace)")
+        import sys
+        import io
+        
+        # Temporarily redirect stdout to suppress verbose insightface/onnxruntime startup logs
+        original_stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        try:
+            from insightface.app import FaceAnalysis
+            _face_app = FaceAnalysis(
+                name=settings.ARCFACE_MODEL_NAME,
+                providers=["CPUExecutionProvider"],
+            )
+            _face_app.prepare(ctx_id=-1, det_size=(640, 640))
+        finally:
+            # Always restore stdout
+            sys.stdout = original_stdout
     return _face_app
 
 
@@ -86,7 +94,7 @@ def get_sharpness(image_bytes: bytes) -> float:
 
 def select_best_embeddings(
     frames: List[bytes],
-    target: int = 50,
+    target: int = settings.MAX_FACE_EMBEDDINGS,
     sharpness_threshold: float = 100.0,
     det_confidence_threshold: float = 0.95,
     dedup_threshold: float = 0.98,
