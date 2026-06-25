@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     DISABLE_EMOTION_DETECTION: bool = True
 
     # ── Attendance Similarity Thresholds ────────────────────────────────────────
-    SIMILARITY_THRESHOLD_PRESENT: float = 0.75
-    SIMILARITY_THRESHOLD_REVIEW: float = 0.65
+    SIMILARITY_THRESHOLD_PRESENT: float = 0.60
+    SIMILARITY_THRESHOLD_REVIEW: float = 0.50
 
     # ── Rate Limiting ────────────────────────────────────────────────────────────
     MAX_VERIFICATION_ATTEMPTS: int = 5
