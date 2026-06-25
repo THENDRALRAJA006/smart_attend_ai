@@ -19,9 +19,9 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: MAX_FACE_EMBEDDINGS
-        value: "50"
+        value: "15"
       - key: MIN_FRAMES_FOR_REGISTRATION
-        value: "20"
+        value: "15"
       - key: SHARPNESS_THRESHOLD
         value: "100.0"
       - key: DETECTION_CONFIDENCE_THRESHOLD

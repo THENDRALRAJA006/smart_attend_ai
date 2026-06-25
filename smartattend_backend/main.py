@@ -1,3 +1,11 @@
+import os
+# TensorFlow & CUDA memory and log optimization
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+os.environ["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+
+print("Loading environment...", flush=True)
+
 import sys
 # Force stdout/stderr to use UTF-8 encoding on Windows consoles
 if sys.stdout.encoding != 'utf-8':
@@ -6,10 +14,6 @@ if sys.stdout.encoding != 'utf-8':
         sys.stderr.reconfigure(encoding='utf-8')
     except Exception:
         pass
-
-# Log memory at the absolute beginning of application import
-from app.utils.memory_utils import log_memory_usage
-log_memory_usage("Start of main.py import")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,8 +27,6 @@ from app.api.faculty import router as faculty_router
 from app.api.student import router as students_router, old_router as student_router
 from app.api.admin import router as admin_router
 from app.config.config import settings
-
-log_memory_usage("End of main.py import")
 
 app = FastAPI(
     title="SmartAttend AI",
@@ -60,17 +62,26 @@ app.include_router(admin_router)
 
 @app.on_event("startup")
 def verify_db_connection():
-    """Validate Database connectivity on startup. Fails fast to prevent unhealthy deploys."""
-    log_memory_usage("FastAPI Startup event triggered")
-    print(f"[SmartAttend AI] Connecting to Database — Environment: {settings.ENVIRONMENT}")
+    """Validate Database connectivity on startup and pre-initialize ArcFace."""
+    print("Connecting PostgreSQL...", flush=True)
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        print("[SmartAttend AI] ✅ Database connection verified successfully.")
-        log_memory_usage("Post Database verification")
+        print("Database connected.", flush=True)
     except Exception as e:
-        print(f"[SmartAttend AI] ❌ CRITICAL: Database connection failed: {e}")
+        print(f"[SmartAttend AI] ❌ CRITICAL: Database connection failed: {e}", flush=True)
         raise e
+
+    print("Initializing ArcFace...", flush=True)
+    try:
+        from app.utils.face_utils import get_face_analysis_app
+        get_face_analysis_app()
+        print("ArcFace ready.", flush=True)
+    except Exception as e:
+        print(f"[SmartAttend AI] ❌ WARNING: ArcFace initialization failed: {e}", flush=True)
+
+    print("Starting FastAPI...", flush=True)
+    print("Server ready.", flush=True)
 
 
 # ── Health Check ──────────────────────────────────────────────────────────────

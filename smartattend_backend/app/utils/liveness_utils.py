@@ -27,12 +27,14 @@ def get_deepface_emotion_model() -> Any:
     """
     global _deepface_emotion_model
     if _deepface_emotion_model is None:
+        print("Loading Emotion model...", flush=True)
         from app.utils.memory_utils import log_memory_usage
         log_memory_usage("Before Lazy loading DeepFace/TensorFlow")
         from deepface import DeepFace
         # Build the model once to cache it in DeepFace's internal structure
-        _deepface_emotion_model = DeepFace.build_model('Emotion')
+        _deepface_emotion_model = DeepFace.build_model('Emotion', task='facial_attribute')
         log_memory_usage("After Lazy loading DeepFace/TensorFlow")
+        print("Emotion model ready.", flush=True)
     return _deepface_emotion_model
 
 

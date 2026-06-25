@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
 
     # ── Face Registration Tuning ─────────────────────────────────────────────────
-    MAX_FACE_EMBEDDINGS: int = 20
+    MAX_FACE_EMBEDDINGS: int = 15
     MIN_FRAMES_FOR_REGISTRATION: int = 20
     SHARPNESS_THRESHOLD: float = 100.0
     DETECTION_CONFIDENCE_THRESHOLD: float = 0.95
