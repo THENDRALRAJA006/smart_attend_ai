@@ -21,13 +21,21 @@ def _hash(password: str) -> str:
 
 def upgrade() -> None:
     bind = op.get_bind()
+    is_postgres = bind.dialect.name == 'postgresql'
 
     # ── Default Admin ─────────────────────────────────────────────────────────
-    bind.execute(
-        sa.text(
+    if is_postgres:
+        admin_sql = (
+            "INSERT INTO admins (email, password_hash, name) VALUES "
+            "(:email, :pw, :name) ON CONFLICT (email) DO NOTHING"
+        )
+    else:
+        admin_sql = (
             "INSERT IGNORE INTO admins (email, password_hash, name) VALUES "
             "(:email, :pw, :name)"
-        ),
+        )
+    bind.execute(
+        sa.text(admin_sql),
         {
             "email": "admin@smartattend.ai",
             "pw": _hash("Admin@2026"),
@@ -42,11 +50,18 @@ def upgrade() -> None:
         ("ROOM201", "Science Block", 45),
         ("LAB301",  "Lab Block",   30),
     ]:
-        bind.execute(
-            sa.text(
+        if is_postgres:
+            classroom_sql = (
+                "INSERT INTO classrooms (room_name, building, capacity) "
+                "VALUES (:rn, :b, :c) ON CONFLICT (room_name) DO NOTHING"
+            )
+        else:
+            classroom_sql = (
                 "INSERT IGNORE INTO classrooms (room_name, building, capacity) "
                 "VALUES (:rn, :b, :c)"
-            ),
+            )
+        bind.execute(
+            sa.text(classroom_sql),
             {"rn": room_name, "b": building, "c": cap},
         )
 
@@ -57,16 +72,24 @@ def upgrade() -> None:
     room101_id = row[0] if row else 1
 
     # ── Sample BLE Beacon for ROOM101 ─────────────────────────────────────────
-    bind.execute(
-        sa.text(
+    if is_postgres:
+        beacon_sql = (
+            "INSERT INTO ble_beacons (classroom_id, uuid, device_name, rssi_threshold, is_active) "
+            "VALUES (:cid, :uuid, :dn, :rssi, :is_active) ON CONFLICT (uuid) DO NOTHING"
+        )
+    else:
+        beacon_sql = (
             "INSERT IGNORE INTO ble_beacons (classroom_id, uuid, device_name, rssi_threshold, is_active) "
-            "VALUES (:cid, :uuid, :dn, :rssi, 1)"
-        ),
+            "VALUES (:cid, :uuid, :dn, :rssi, :is_active)"
+        )
+    bind.execute(
+        sa.text(beacon_sql),
         {
             "cid": room101_id,
             "uuid": "SMARTATTEND-ROOM101-ESP32-001",
             "dn": "SMARTATTEND_ROOM101",
             "rssi": -70,
+            "is_active": True,
         },
     )
 
@@ -79,20 +102,34 @@ def upgrade() -> None:
         ("Computer Networks", "CS303", "Computer Science", 3),
     ]
     for subject_name, code, dept, year in subjects:
-        bind.execute(
-            sa.text(
+        if is_postgres:
+            subject_sql = (
+                "INSERT INTO subjects (subject_name, subject_code, department, year) "
+                "VALUES (:sn, :sc, :dept, :yr) ON CONFLICT (subject_code) DO NOTHING"
+            )
+        else:
+            subject_sql = (
                 "INSERT IGNORE INTO subjects (subject_name, subject_code, department, year) "
                 "VALUES (:sn, :sc, :dept, :yr)"
-            ),
+            )
+        bind.execute(
+            sa.text(subject_sql),
             {"sn": subject_name, "sc": code, "dept": dept, "yr": year},
         )
 
     # ── Sample Faculty ────────────────────────────────────────────────────────
-    bind.execute(
-        sa.text(
+    if is_postgres:
+        faculty_sql = (
+            "INSERT INTO faculty (name, email, password_hash, department) "
+            "VALUES (:name, :email, :pw, :dept) ON CONFLICT (email) DO NOTHING"
+        )
+    else:
+        faculty_sql = (
             "INSERT IGNORE INTO faculty (name, email, password_hash, department) "
             "VALUES (:name, :email, :pw, :dept)"
-        ),
+        )
+    bind.execute(
+        sa.text(faculty_sql),
         {
             "name": "Dr. Sample Faculty",
             "email": "faculty@smartattend.ai",
