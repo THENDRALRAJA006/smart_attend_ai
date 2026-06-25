@@ -13,8 +13,28 @@ import cv2
 import numpy as np
 from typing import List
 
-from deepface import DeepFace
 from app.utils.face_utils import get_face_analysis_app
+from typing import Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from deepface import DeepFace
+
+_deepface_emotion_model: Any = None
+
+def get_deepface_emotion_model() -> Any:
+    """
+    Lazy-loads and caches the DeepFace Emotion model to prevent memory exhaustion on startup.
+    """
+    global _deepface_emotion_model
+    if _deepface_emotion_model is None:
+        from app.utils.memory_utils import log_memory_usage
+        log_memory_usage("Before Lazy loading DeepFace/TensorFlow")
+        from deepface import DeepFace
+        # Build the model once to cache it in DeepFace's internal structure
+        _deepface_emotion_model = DeepFace.build_model('Emotion')
+        log_memory_usage("After Lazy loading DeepFace/TensorFlow")
+    return _deepface_emotion_model
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -187,6 +207,14 @@ def verify_liveness(frames_bytes_list: List[bytes], challenge: str) -> bool:
 
     # ── Smile ─────────────────────────────────────────────────────────────────
     elif challenge == "smile":
+        from app.config.config import settings
+        if settings.DISABLE_EMOTION_DETECTION:
+            print("[LIVENESS WARNING] Smile challenge requested but emotion detection is disabled to fit in 512MB RAM. Auto-verifying smile challenge.", flush=True)
+            return True
+
+        # Ensure model is loaded and cached
+        get_deepface_emotion_model()
+        from deepface import DeepFace
         for frame_bytes in frames_bytes_list:
             try:
                 nparr = np.frombuffer(frame_bytes, np.uint8)
@@ -203,6 +231,7 @@ def verify_liveness(frames_bytes_list: List[bytes], challenge: str) -> bool:
             except Exception:
                 continue
         return False
+
 
     # ── Turn Left ─────────────────────────────────────────────────────────────
     elif challenge == "turn_left":

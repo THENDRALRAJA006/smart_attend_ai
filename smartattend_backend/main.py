@@ -7,6 +7,10 @@ if sys.stdout.encoding != 'utf-8':
     except Exception:
         pass
 
+# Log memory at the absolute beginning of application import
+from app.utils.memory_utils import log_memory_usage
+log_memory_usage("Start of main.py import")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -19,6 +23,8 @@ from app.api.faculty import router as faculty_router
 from app.api.student import router as students_router, old_router as student_router
 from app.api.admin import router as admin_router
 from app.config.config import settings
+
+log_memory_usage("End of main.py import")
 
 app = FastAPI(
     title="SmartAttend AI",
@@ -52,15 +58,16 @@ app.include_router(student_router)
 app.include_router(admin_router)
 
 
-# ── Startup: validate DB connection ──────────────────────────────────────────
 @app.on_event("startup")
 def verify_db_connection():
     """Validate MySQL connectivity on startup. Fails fast to prevent unhealthy deploys."""
+    log_memory_usage("FastAPI Startup event triggered")
     print(f"[SmartAttend AI] Connecting to MySQL (AWS RDS) — Environment: {settings.ENVIRONMENT}")
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         print("[SmartAttend AI] ✅ Database connection verified successfully.")
+        log_memory_usage("Post Database verification")
     except Exception as e:
         print(f"[SmartAttend AI] ❌ CRITICAL: Database connection failed: {e}")
         raise e

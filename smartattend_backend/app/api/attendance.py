@@ -57,7 +57,10 @@ def get_liveness_challenge(
     and a challenge token valid for LIVENESS_TOKEN_EXPIRY_MINUTES minutes.
     """
     import random
-    challenge_type = random.choice(["blink", "smile", "turn_left", "turn_right"])
+    challenges = ["blink", "turn_left", "turn_right"]
+    if not settings.DISABLE_EMOTION_DETECTION:
+        challenges.append("smile")
+    challenge_type = random.choice(challenges)
     token_str = str(uuid.uuid4())
     expiry = datetime.utcnow() + timedelta(minutes=settings.LIVENESS_TOKEN_EXPIRY_MINUTES)
 

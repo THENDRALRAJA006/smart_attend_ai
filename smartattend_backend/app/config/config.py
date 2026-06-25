@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
 
     # ── ArcFace / InsightFace ────────────────────────────────────────────────────
-    ARCFACE_MODEL_NAME: str = "buffalo_l"
+    ARCFACE_MODEL_NAME: str = "buffalo_s"
 
     # ── Environment ─────────────────────────────────────────────────────────────
     ENVIRONMENT: str = "production"
@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # ── Liveness ─────────────────────────────────────────────────────────────────
     LIVENESS_TOKEN_EXPIRY_MINUTES: int = 3
+    DISABLE_EMOTION_DETECTION: bool = True
 
     # ── Attendance Similarity Thresholds ────────────────────────────────────────
     SIMILARITY_THRESHOLD_PRESENT: float = 0.75

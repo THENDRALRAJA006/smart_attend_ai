@@ -6,29 +6,36 @@ All processing is in-memory — no images ever written to disk.
 """
 import cv2
 import numpy as np
-from insightface.app import FaceAnalysis
-from typing import List
+from typing import List, Optional, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from insightface.app import FaceAnalysis
 
 from app.utils.embedding_utils import cosine_similarity
 from app.config.config import settings
+from app.utils.memory_utils import log_memory_usage
 
 # ── Lazy-loaded singleton ─────────────────────────────────────────────────────
-_face_app: FaceAnalysis | None = None
+_face_app: Optional["FaceAnalysis"] = None
 
 
-def get_face_analysis_app() -> FaceAnalysis:
+def get_face_analysis_app() -> Any:
     """
     Lazy-initialises the InsightFace FaceAnalysis app so that Alembic
     migrations and test imports do NOT trigger model loading.
     """
     global _face_app
     if _face_app is None:
+        log_memory_usage("Before Lazy loading ArcFace (InsightFace)")
+        from insightface.app import FaceAnalysis
         _face_app = FaceAnalysis(
             name=settings.ARCFACE_MODEL_NAME,
             providers=["CPUExecutionProvider"],
         )
         _face_app.prepare(ctx_id=0, det_size=(640, 640))
+        log_memory_usage("After Lazy loading ArcFace (InsightFace)")
     return _face_app
+
 
 
 # ── Core Embedding Extraction ─────────────────────────────────────────────────

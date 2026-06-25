@@ -15,7 +15,7 @@ services:
       - key: JWT_ALGORITHM
         value: HS256
       - key: ARCFACE_MODEL_NAME
-        value: buffalo_l
+        value: buffalo_s
       - key: ENVIRONMENT
         value: production
       - key: MAX_FACE_EMBEDDINGS
@@ -46,6 +46,6 @@ services:
     startCommand: >
       sh -c "cd /app &&
       alembic upgrade head &&
-      uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 --timeout-keep-alive 65"
+      gunicorn main:app -k uvicorn.workers.UvicornWorker --workers 1 --threads 1 --timeout 120 --bind 0.0.0.0:$PORT"
 
     autoDeploy: true

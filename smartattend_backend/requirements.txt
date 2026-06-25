@@ -19,3 +19,4 @@ pydantic-settings>=2.2.1
 email-validator>=2.0.0
 tf-keras
 sse-starlette>=1.6.5
+gunicorn>=21.2.0
