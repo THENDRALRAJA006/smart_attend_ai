@@ -13,21 +13,28 @@ class AuthService extends GetxService {
   final RxMap currentUser = {}.obs;
 
   Future<AuthService> init() async {
-    final token = await _storage.read(key: 'jwt_token');
-    final role = await _storage.read(key: 'user_role');
-    final name = await _storage.read(key: 'user_name');
-    final email = await _storage.read(key: 'user_email');
-    final id = await _storage.read(key: 'user_id');
+    try {
+      final token = await _storage.read(key: 'jwt_token');
+      final role = await _storage.read(key: 'user_role');
+      final name = await _storage.read(key: 'user_name');
+      final email = await _storage.read(key: 'user_email');
+      final id = await _storage.read(key: 'user_id');
 
-    if (token != null && role != null) {
-      isLoggedIn.value = true;
-      userRole.value = role;
-      currentUser.value = {
-        'id': id,
-        'name': name,
-        'email': email,
-        'role': role,
-      };
+      if (token != null && role != null) {
+        isLoggedIn.value = true;
+        userRole.value = role;
+        currentUser.value = {
+          'id': id,
+          'name': name,
+          'email': email,
+          'role': role,
+        };
+      }
+    } catch (e) {
+      // Clear secure storage on corruption/read error to recover
+      try {
+        await _storage.deleteAll();
+      } catch (_) {}
     }
     return this;
   }

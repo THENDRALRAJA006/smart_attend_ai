@@ -66,5 +66,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera is used for face registration and liveness verification</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth is used to detect classroom proximity beacons</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Bluetooth proximity is used to verify classroom attendance</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location is required for BLE scanning on iOS</string>
 </dict>
 </plist>
