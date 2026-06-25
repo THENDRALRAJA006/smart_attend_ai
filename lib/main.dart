@@ -11,9 +11,14 @@ import 'core/services/liveness_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Core Services sequentially
-  await Get.putAsync(() => ApiService().init());
-  await Get.putAsync(() => AuthService().init());
+  // Initialize Core Services
+  final apiService = ApiService();
+  Get.put(apiService);
+  await apiService.init();
+
+  final authService = AuthService();
+  Get.put(authService);
+  authService.init(); // Run in background, don't await blocking the startup UI
   
   Get.put(BleService());
   Get.put(FaceService());

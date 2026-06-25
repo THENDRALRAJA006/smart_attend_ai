@@ -1,8 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get/get.dart';
 import 'api_service.dart';
 import '../constants/api_constants.dart';
 import '../../app/routes/app_pages.dart';
+import 'face_service.dart';
 
 class AuthService extends GetxService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -29,6 +31,27 @@ class AuthService extends GetxService {
           'email': email,
           'role': role,
         };
+
+        // Auto-navigate to correct dashboard in the next frame
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (role == 'student') {
+            try {
+              final faceService = Get.find<FaceService>();
+              final faceStatus = await faceService.getFaceRegistrationStatus();
+              if (faceStatus != null && faceStatus['is_face_registered'] == true) {
+                Get.offAllNamed(Routes.STUDENT_DASHBOARD);
+              } else {
+                Get.offAllNamed(Routes.FACE_REGISTRATION);
+              }
+            } catch (_) {
+              Get.offAllNamed(Routes.FACE_REGISTRATION);
+            }
+          } else if (role == 'faculty') {
+            Get.offAllNamed(Routes.FACULTY_DASHBOARD);
+          } else if (role == 'admin') {
+            Get.offAllNamed(Routes.ADMIN_DASHBOARD);
+          }
+        });
       }
     } catch (e) {
       // Clear secure storage on corruption/read error to recover
