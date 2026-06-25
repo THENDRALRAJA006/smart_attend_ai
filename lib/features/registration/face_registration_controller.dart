@@ -82,7 +82,7 @@ class FaceRegistrationController extends GetxController {
     _nextPose();
   }
 
-  void _nextPose() {
+  void _nextPose() async {
     if (currentPoseIndex.value >= poses.length) {
       // Completed all poses, upload frames
       _uploadRegistrationFrames();
@@ -91,34 +91,34 @@ class FaceRegistrationController extends GetxController {
 
     timerCountdown.value = 3;
 
-    // Start 3-second countdown timer for this pose
+    // Start a simple visual-only countdown timer (does not auto-trigger next pose)
     _poseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (timerCountdown.value > 1) {
         timerCountdown.value--;
       } else {
         timer.cancel();
-        _frameCaptureTimer?.cancel();
-        currentPoseIndex.value++;
-        _nextPose();
       }
     });
 
-    // Capture 6 frames evenly spaced during the 3-second interval (approx one every 450ms)
+    // Capture exactly 6 frames sequentially to prevent race conditions or busy state errors
     int framesForThisPose = 0;
-    _frameCaptureTimer = Timer.periodic(const Duration(milliseconds: 450), (timer) async {
-      if (framesForThisPose < 6 && cameraController != null && cameraController!.value.isInitialized) {
-        try {
-          final XFile file = await cameraController!.takePicture();
-          capturedFrames.add(file);
-          framesCaptured.value = capturedFrames.length;
-          framesForThisPose++;
-        } catch (e) {
-          // Skip frame if camera is busy
-        }
-      } else {
-        timer.cancel();
+    while (framesForThisPose < 6 && cameraController != null && cameraController!.value.isInitialized) {
+      try {
+        final XFile file = await cameraController!.takePicture();
+        capturedFrames.add(file);
+        framesCaptured.value = capturedFrames.length;
+        framesForThisPose++;
+      } catch (e) {
+        // Skip frame if camera is busy or fails temporarily
       }
-    });
+      // Wait 350ms between captures to allow camera to stabilize and complete focus
+      await Future.delayed(const Duration(milliseconds: 350));
+    }
+
+    // Move to next pose
+    _poseTimer?.cancel();
+    currentPoseIndex.value++;
+    _nextPose();
   }
 
   Future<void> _uploadRegistrationFrames() async {
