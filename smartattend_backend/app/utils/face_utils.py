@@ -32,7 +32,7 @@ def get_face_analysis_app() -> Any:
             name=settings.ARCFACE_MODEL_NAME,
             providers=["CPUExecutionProvider"],
         )
-        _face_app.prepare(ctx_id=0, det_size=(640, 640))
+        _face_app.prepare(ctx_id=-1, det_size=(640, 640))
         log_memory_usage("After Lazy loading ArcFace (InsightFace)")
     return _face_app
 
