@@ -2,7 +2,7 @@ name: smart_attend_ai
 description: "SmartAttend AI — Production College Attendance System with BLE + ArcFace"
 publish_to: 'none'
 
-version: 3.0.0+4
+version: 3.0.0+5
 
 environment:
   sdk: ^3.12.2

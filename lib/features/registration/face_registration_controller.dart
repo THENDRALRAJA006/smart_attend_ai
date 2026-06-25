@@ -16,19 +16,9 @@ class FaceRegistrationController extends GetxController {
   final List<String> poses = [
     'Look straight ahead',
     'Smile naturally',
-    'Blink slowly',
-    'Turn head left 15°',
-    'Turn head right 15°',
-    'Turn head left 30°',
-    'Turn head right 30°',
-    'Look up slightly',
-    'Look down slightly',
-    'Neutral expression',
-    'Slight smile',
-    'With glasses (if applicable)',
-    'Look towards a bright light',
-    'Indoor ambient light',
-    'Normal face'
+    'Turn head left slightly',
+    'Turn head right slightly',
+    'Look up slightly'
   ];
 
   final RxInt currentPoseIndex = 0.obs;
@@ -113,10 +103,10 @@ class FaceRegistrationController extends GetxController {
       }
     });
 
-    // Capture 8 frames evenly spaced during the 3-second interval (approx one every 350ms)
+    // Capture 6 frames evenly spaced during the 3-second interval (approx one every 450ms)
     int framesForThisPose = 0;
-    _frameCaptureTimer = Timer.periodic(const Duration(milliseconds: 350), (timer) async {
-      if (framesForThisPose < 8 && cameraController != null && cameraController!.value.isInitialized) {
+    _frameCaptureTimer = Timer.periodic(const Duration(milliseconds: 450), (timer) async {
+      if (framesForThisPose < 6 && cameraController != null && cameraController!.value.isInitialized) {
         try {
           final XFile file = await cameraController!.takePicture();
           capturedFrames.add(file);
@@ -138,7 +128,7 @@ class FaceRegistrationController extends GetxController {
 
     Get.snackbar(
       'Capturing Complete',
-      'Uploading and analyzing 120 facial poses. Please wait...',
+      'Uploading and analyzing 30 facial poses. Please wait...',
       duration: const Duration(seconds: 5),
     );
 

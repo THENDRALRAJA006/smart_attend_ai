@@ -24,6 +24,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# ── Pre-download model weights to cache them in the image ─────────────────────
+RUN python -c "from insightface.app import FaceAnalysis; FaceAnalysis(name='buffalo_s').prepare(ctx_id=-1)"
+
 # ── Application code ──────────────────────────────────────────────────────────
 COPY . .
 
