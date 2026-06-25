@@ -147,7 +147,7 @@
 - [ ] `ApiConstants.baseUrl` set to production Render URL
 - [ ] SSL/TLS connection working (Render provides HTTPS)
 - [ ] JWT stored in `flutter_secure_storage` (never in SharedPreferences)
-- [ ] Camera permission requested at runtime
+- [x] Camera permission requested at runtime
 - [ ] BLE permission requested at runtime
 
 ---

@@ -49,16 +49,22 @@ class Settings(BaseSettings):
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
-    def assemble_mysql_url(cls, v: Optional[str]) -> Optional[str]:
-        """Normalise DATABASE_URL to pymysql driver string."""
+    def assemble_db_url(cls, v: Optional[str]) -> Optional[str]:
+        """Normalise DATABASE_URL to the correct SQLAlchemy driver string."""
         if v:
-            # Replace postgres-style prefixes that sometimes leak from env
-            for prefix in ("postgresql+psycopg2://", "postgresql://", "postgres://"):
-                if v.startswith(prefix):
-                    v = "mysql+pymysql://" + v[len(prefix):]
-            # Ensure correct MySQL driver prefix
+            # Support PostgreSQL (e.g. Supabase)
+            if v.startswith("postgresql://") or v.startswith("postgres://"):
+                prefix = "postgresql://" if v.startswith("postgresql://") else "postgres://"
+                return "postgresql+psycopg2://" + v[len(prefix):]
+            elif v.startswith("postgresql+psycopg2://"):
+                return v
+
+            # Support MySQL
             if not v.startswith("mysql+pymysql://"):
-                v = v.replace("mysql://", "mysql+pymysql://")
+                if v.startswith("mysql://"):
+                    v = v.replace("mysql://", "mysql+pymysql://")
+                else:
+                    v = "mysql+pymysql://" + v
             return v
         return None
 

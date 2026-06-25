@@ -60,9 +60,9 @@ app.include_router(admin_router)
 
 @app.on_event("startup")
 def verify_db_connection():
-    """Validate MySQL connectivity on startup. Fails fast to prevent unhealthy deploys."""
+    """Validate Database connectivity on startup. Fails fast to prevent unhealthy deploys."""
     log_memory_usage("FastAPI Startup event triggered")
-    print(f"[SmartAttend AI] Connecting to MySQL (AWS RDS) — Environment: {settings.ENVIRONMENT}")
+    print(f"[SmartAttend AI] Connecting to Database — Environment: {settings.ENVIRONMENT}")
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/services/face_service.dart';
 import '../../app/routes/app_pages.dart';
 
@@ -46,9 +47,17 @@ class FaceRegistrationController extends GetxController {
 
   Future<void> _initializeCamera() async {
     try {
+      final status = await Permission.camera.request();
+      if (!status.isGranted) {
+        Get.snackbar('Camera Permission', 'Camera permission is required for face registration.');
+        Get.offAllNamed(Routes.STUDENT_DASHBOARD);
+        return;
+      }
+
       final cameras = await availableCameras();
       if (cameras.isEmpty) {
         Get.snackbar('Camera Error', 'No cameras detected on this device.');
+        Get.offAllNamed(Routes.STUDENT_DASHBOARD);
         return;
       }
 
@@ -71,6 +80,7 @@ class FaceRegistrationController extends GetxController {
       Future.delayed(const Duration(seconds: 1), _startGuidedCapture);
     } catch (e) {
       Get.snackbar('Camera Error', 'Failed to initialize camera: $e');
+      Get.offAllNamed(Routes.STUDENT_DASHBOARD);
     }
   }
 

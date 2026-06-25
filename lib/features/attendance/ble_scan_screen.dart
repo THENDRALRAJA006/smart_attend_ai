@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'attendance_controller.dart';
 import '../../core/services/ble_service.dart';
 
@@ -161,10 +162,21 @@ class _BleScanScreenState extends State<BleScanScreen> with SingleTickerProvider
               side: const BorderSide(color: Color(0xFF00D2FF)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () {
-              setState(() {
-                showQRScanner = true;
-              });
+            onPressed: () async {
+              final status = await Permission.camera.request();
+              if (status.isGranted) {
+                setState(() {
+                  showQRScanner = true;
+                });
+              } else {
+                Get.snackbar(
+                  'Camera Permission',
+                  'Camera permission is required to use the QR scanner.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  backgroundColor: const Color(0xFF161722),
+                  colorText: Colors.white,
+                );
+              }
             },
             icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF00D2FF)),
             label: const Text('QR FALLBACK SCANNER', style: TextStyle(color: Color(0xFF00D2FF), fontWeight: FontWeight.bold)),

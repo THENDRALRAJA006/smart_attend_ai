@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:dio/dio.dart' as dio_pkg;
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../core/services/ble_service.dart';
 import '../../core/services/liveness_service.dart';
 import '../../core/services/api_service.dart';
@@ -102,7 +103,13 @@ class AttendanceController extends GetxController {
       currentChallenge.value = challengeRes.challenge;
       
       // Initialize Front Camera for Liveness capture
-      await _initCamera();
+      final bool initialized = await _initCamera();
+      if (!initialized) {
+        // Return to first step (BLE Scan) if camera couldn't be initialized
+        currentStep.value = 1;
+        _bleService.startBeaconScan();
+        return;
+      }
       
       // Start Countdown and record frames
       _startLivenessRecording();
@@ -112,8 +119,14 @@ class AttendanceController extends GetxController {
     }
   }
 
-  Future<void> _initCamera() async {
+  Future<bool> _initCamera() async {
     try {
+      final status = await Permission.camera.request();
+      if (!status.isGranted) {
+        Get.snackbar('Camera Permission', 'Camera permission is required for face liveness verification.');
+        return false;
+      }
+
       final cameras = await availableCameras();
       final frontCamera = cameras.firstWhere(
         (cam) => cam.lensDirection == CameraLensDirection.front,
@@ -128,8 +141,10 @@ class AttendanceController extends GetxController {
 
       await cameraController!.initialize();
       isCameraInitialized.value = true;
+      return true;
     } catch (e) {
       Get.snackbar('Camera Error', 'Could not open front camera.');
+      return false;
     }
   }
 
