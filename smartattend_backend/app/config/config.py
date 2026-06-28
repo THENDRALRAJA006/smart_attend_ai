@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     DETECTION_CONFIDENCE_THRESHOLD: float = 0.95
     DEDUP_SIMILARITY_THRESHOLD: float = 0.98
 
+    # ── Master Embedding Pipeline ────────────────────────────────────────────────
+    MIN_VALID_EMBEDDINGS: int = 10
+    OUTLIER_SIMILARITY_THRESHOLD: float = 0.5
+    BRIGHTNESS_MIN: int = 40
+    BRIGHTNESS_MAX: int = 220
+    MIN_FACE_SIZE: int = 80
+    MAX_FACE_YAW: float = 30.0
+    MAX_FACE_PITCH: float = 20.0
+    EMBEDDING_VERSION: str = "buffalo_s_v1"
+
     # ── Liveness ─────────────────────────────────────────────────────────────────
     LIVENESS_TOKEN_EXPIRY_MINUTES: int = 3
     DISABLE_EMOTION_DETECTION: bool = True

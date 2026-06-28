@@ -21,3 +21,4 @@ tf-keras
 sse-starlette>=1.6.5
 gunicorn>=21.2.0
 psycopg2-binary>=2.9.9
+pgvector>=0.3.0

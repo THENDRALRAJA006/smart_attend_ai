@@ -1,6 +1,6 @@
 """
 SmartAttend AI — Alembic env.py
-Synchronous MySQL migration runner using PyMySQL.
+Synchronous PostgreSQL migration runner.
 """
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
@@ -13,7 +13,7 @@ from app.database.database import Base
 # Import ALL models so that their table metadata is registered with Base
 from app.models.models import (
     Student, Faculty, Admin, Subject, Classroom, BleBeacon,
-    AttendanceSession, FaceEmbedding, Attendance, LivenessToken,
+    AttendanceSession, Attendance, LivenessToken,
 )
 
 config = context.config
@@ -37,7 +37,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode using a live MySQL connection."""
+    """Run migrations in 'online' mode using a live PostgreSQL connection."""
     alembic_config = config.get_section(config.config_ini_section, {})
     alembic_config["sqlalchemy.url"] = settings.DATABASE_URL
 

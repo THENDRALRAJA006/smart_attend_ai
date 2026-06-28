@@ -19,7 +19,7 @@ from datetime import datetime
 from app.database.database import get_db
 from app.models.models import (
     Student, Faculty, Admin, Subject, Classroom, BleBeacon,
-    AttendanceSession, Attendance, FaceEmbedding,
+    AttendanceSession, Attendance,
 )
 from app.schemas.schemas import (
     StudentSchema, FacultySchema, SubjectSchema, ClassroomSchema,

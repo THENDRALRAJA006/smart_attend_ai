@@ -6,7 +6,6 @@ from .models import (
     Classroom,
     BleBeacon,
     AttendanceSession,
-    FaceEmbedding,
     Attendance,
     LivenessToken,
     # Backwards-compatibility aliases
@@ -22,7 +21,6 @@ __all__ = [
     "Classroom",
     "BleBeacon",
     "AttendanceSession",
-    "FaceEmbedding",
     "Attendance",
     "LivenessToken",
     "AttendanceRecord",

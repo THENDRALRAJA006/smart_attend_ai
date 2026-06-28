@@ -32,10 +32,10 @@ app = FastAPI(
     title="SmartAttend AI",
     description=(
         "Production-ready AI-powered college attendance platform.\n\n"
-        "Features: BLE proximity detection, ArcFace face verification (50-embedding system), "
-        "DeepFace liveness anti-spoofing, JWT auth with role-based access control."
+        "Features: BLE proximity detection, ArcFace face verification (master-embedding system), "
+        "DeepFace liveness anti-spoofing, JWT auth with role-based access control, pgvector similarity search."
     ),
-    version="3.0.0",
+    version="4.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -97,7 +97,7 @@ def health_check():
 
     return {
         "service": "SmartAttend AI",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "status": "running",
         "database": db_status,
         "environment": settings.ENVIRONMENT,

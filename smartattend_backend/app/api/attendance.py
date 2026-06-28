@@ -1,6 +1,10 @@
 """
 SmartAttend AI — Attendance & Liveness Router
 
+Master-embedding architecture: verification uses a single cosine similarity
+comparison against the student's master embedding instead of iterating
+a gallery of 50 embeddings.
+
 Liveness Endpoints:
   POST /liveness/challenge → generate random challenge + liveness-challenge token
   POST /liveness/verify   → verify challenge frames → issue liveness-success token
@@ -13,15 +17,16 @@ Attendance Endpoints:
   GET  /attendance/student/{id} → attendance records for a specific student
 """
 import uuid
-import json
+import logging
 from datetime import datetime, timedelta, date, time as dtime
 from typing import List, Optional
 
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from app.database.database import get_db
-from app.models.models import Student, AttendanceSession, Attendance, LivenessToken, FaceEmbedding
+from app.models.models import Student, AttendanceSession, Attendance, LivenessToken
 from app.schemas.schemas import (
     LivenessChallengeResponse, LivenessVerifyResponse,
     AttendanceResponse, SessionResponse,
@@ -29,8 +34,10 @@ from app.schemas.schemas import (
 from app.dependencies import get_current_student, get_current_faculty
 from app.utils.liveness_utils import verify_liveness
 from app.utils.face_utils import get_embedding
-from app.utils.embedding_utils import batch_cosine_similarities, max_cosine_similarity
+from app.utils.embedding_utils import cosine_similarity
 from app.config.config import settings
+
+logger = logging.getLogger("smartattend.attendance")
 
 router = APIRouter(prefix="/attendance", tags=["attendance"])
 liveness_router = APIRouter(prefix="/liveness", tags=["liveness"])
@@ -158,9 +165,9 @@ def _execute_attendance_marking(
       3. Rate-limit check (max 5 attempts per student per session)
       4. Duplicate attendance check (UNIQUE constraint guard)
       5. Extract ArcFace embedding from selfie
-      6. Load all 50 stored embeddings for the student
-      7. Vectorised cosine similarity comparison
-      8. Apply thresholds (present ≥ 0.75, review ≥ 0.65, else rejected)
+      6. Load the student's master embedding (single vector)
+      7. Single cosine similarity comparison
+      8. Apply thresholds (present ≥ 0.60, review ≥ 0.50, else rejected)
       9. Persist attendance record
     """
     # 1. Validate liveness token
@@ -234,31 +241,27 @@ def _execute_attendance_marking(
         db.commit()
         raise HTTPException(status_code=400, detail="Attendance already marked for this session")
 
-    # 5. Extract live embedding
+    # 5. Extract live embedding from selfie
     try:
         selfie_bytes = selfie.file.read()
         live_embedding = get_embedding(selfie_bytes)
+        del selfie_bytes  # Free immediately
     except Exception as e:
         db.commit()
         raise HTTPException(status_code=400, detail=f"Face extraction failed: {e}")
 
-    # 6. Load stored embeddings
-    stored_rows = db.query(FaceEmbedding).filter(
-        FaceEmbedding.student_id == current_student.id
-    ).all()
-
-    if not stored_rows:
+    # 6. Load the student's master embedding (single vector)
+    if current_student.master_embedding is None:
         db.commit()
         raise HTTPException(
             status_code=400,
-            detail="No registered face embeddings found. Please complete face registration first.",
+            detail="No registered face embedding found. Please complete face registration first.",
         )
 
-    gallery = [json.loads(r.embedding_json) for r in stored_rows]
+    master_emb = np.array(current_student.master_embedding, dtype=np.float32)
 
-    # 7. Vectorised cosine similarity
-    sims = batch_cosine_similarities(live_embedding, gallery)
-    max_sim = max(sims) if sims else 0.0
+    # 7. Single cosine similarity comparison
+    max_sim = cosine_similarity(live_embedding, master_emb)
 
     # 8. Threshold classification
     if max_sim >= settings.SIMILARITY_THRESHOLD_PRESENT:
@@ -287,6 +290,11 @@ def _execute_attendance_marking(
     db.add(new_att)
     db.commit()
     db.refresh(new_att)
+
+    logger.info(
+        "Attendance marked: student=%d, session=%d, status=%s, similarity=%.4f",
+        current_student.id, session.id, att_status, max_sim,
+    )
 
     return {
         "status": att_status,

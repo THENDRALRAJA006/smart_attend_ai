@@ -58,6 +58,8 @@ class LoginResponse(BaseModel):
 class FaceStatusResponse(BaseModel):
     is_face_registered: bool
     embedding_count: int
+    quality_score: Optional[float] = None
+    embedding_version: Optional[str] = None
 
 
 class FaceRegisterPayload(BaseModel):

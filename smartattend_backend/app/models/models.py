@@ -1,8 +1,10 @@
 """
-SmartAttend AI — SQLAlchemy ORM Models (MySQL 8.0 / AWS RDS)
+SmartAttend AI — SQLAlchemy ORM Models (PostgreSQL / Supabase)
 
-All tables match Section 4 of the specification exactly.
-No images are ever stored — embeddings only.
+Master-embedding architecture:
+  - Each student stores ONE 512-dim ArcFace master embedding (pgvector).
+  - No images or multi-row embedding galleries are stored.
+  - Similarity search uses pgvector's native cosine distance operator.
 """
 from datetime import datetime
 from sqlalchemy import (
@@ -10,6 +12,9 @@ from sqlalchemy import (
     Float, ForeignKey, Enum, Text, Index, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
+
+
 from app.database.database import Base
 
 
@@ -26,13 +31,16 @@ class Student(Base):
     email = Column(String(100), unique=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     is_face_registered = Column(Boolean, default=False)
+
+    # ── Biometric Master Embedding ────────────────────────────────────────────
+    master_embedding = Column(Vector(512), nullable=True)
+    embedding_version = Column(String(20), nullable=True)
+    embedding_quality_score = Column(Float, nullable=True)
+    embedding_updated_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
-    face_embeddings = relationship(
-        "FaceEmbedding", back_populates="student",
-        cascade="all, delete-orphan"
-    )
     attendances = relationship(
         "Attendance", back_populates="student",
         cascade="all, delete-orphan"
@@ -150,26 +158,6 @@ class AttendanceSession(Base):
     attendances = relationship(
         "Attendance", back_populates="session",
         cascade="all, delete-orphan"
-    )
-
-
-# ── Face Embeddings ───────────────────────────────────────────────────────────
-class FaceEmbedding(Base):
-    __tablename__ = "face_embeddings"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    student_id = Column(
-        Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False
-    )
-    pose_name = Column(String(50), nullable=True)
-    embedding_json = Column(Text, nullable=False)   # JSON array of 512 floats (LONGTEXT in migration)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    student = relationship("Student", back_populates="face_embeddings")
-
-    __table_args__ = (
-        Index("idx_face_embedding_student", "student_id"),
     )
 
 

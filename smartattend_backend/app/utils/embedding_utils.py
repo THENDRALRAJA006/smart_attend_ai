@@ -1,5 +1,8 @@
 """
 SmartAttend AI — Embedding / Vector Utilities
+
+Provides cosine similarity computations and master embedding generation
+for the ArcFace-based biometric verification system.
 """
 import numpy as np
 from typing import List, Union
@@ -35,8 +38,7 @@ def batch_cosine_similarities(
     Efficiently compute cosine similarity of `query` against all vectors
     in `gallery` using vectorised numpy operations.
 
-    Designed for 5 000+ student scale:
-    Processes the entire 50-embedding gallery of a single student in one matmul.
+    Used internally by the outlier detection pipeline.
     """
     if not gallery:
         return []
@@ -60,13 +62,29 @@ def batch_cosine_similarities(
     return similarities.tolist()
 
 
-def max_cosine_similarity(
-    query: Union[np.ndarray, List[float]],
-    gallery: List[Union[np.ndarray, List[float]]],
-) -> float:
+def compute_master_embedding(
+    embeddings: List[np.ndarray],
+) -> np.ndarray:
     """
-    Return the maximum cosine similarity between `query` and any
-    vector in `gallery`. Returns 0.0 if gallery is empty.
+    Compute a single master embedding as the L2-normalised mean of
+    all input embeddings.
+
+    This is the standard approach used in production biometric systems
+    (FaceNet, ArcFace papers). The mean of L2-normalised embeddings
+    represents the centroid of the face's identity cluster in the
+    512-dimensional embedding space.
+
+    Args:
+        embeddings: List of 512-dim normalised ArcFace embeddings.
+
+    Returns:
+        L2-normalised 512-dim master embedding.
     """
-    sims = batch_cosine_similarities(query, gallery)
-    return max(sims) if sims else 0.0
+    stacked = np.array(embeddings, dtype=np.float32)  # (N, 512)
+    mean_emb = stacked.mean(axis=0)  # (512,)
+
+    norm = np.linalg.norm(mean_emb)
+    if norm > 0:
+        mean_emb = mean_emb / norm
+
+    return mean_emb
